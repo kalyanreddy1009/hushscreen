@@ -510,7 +510,7 @@ function setTrailerButtonVisibility(page, item) {
 }
 
 function renderBackdrop(page, item, apiClient) {
-    if (isLiquidGlass() && !layoutManager.mobile && !layoutManager.tv) {
+    if (isLiquidGlass() && !layoutManager.mobile) {
         const hasBanner = renderHeaderBackdrop(page, item, apiClient);
         page.classList.toggle('lg-details-banner', hasBanner);
         if (hasBanner) {

@@ -53,8 +53,14 @@ $details-wide-query: '(min-width: 75em)';
     overflow-x: clip; // the 1.04 settle scale must not create a horizontal scrollbar
 }
 
-.layout-desktop .itemDetailPage {
+.layout-desktop .itemDetailPage,
+.layout-tv .itemDetailPage {
     --lg-details-hero-h: min(56.25vw, calc(100vh - 3rem));
+}
+
+// TV: the header is opaque, so the hero ends above the screen bottom and the focused Play button stays on screen
+.layout-tv .itemDetailPage {
+    --lg-details-hero-h: min(56.25vw, calc(100vh - 7rem));
 }
 
 .itemDetailPage .itemBackdrop {
@@ -86,11 +92,13 @@ $details-wide-query: '(min-width: 75em)';
 }
 
 // Desktop (any width where the layout class is set, so tablets too): hero, title block and gutter rules
-.layout-desktop .itemDetailPage .itemBackdrop {
+.layout-desktop .itemDetailPage .itemBackdrop,
+.layout-tv .itemDetailPage .itemBackdrop {
     height: 7rem;
 }
 
-.layout-desktop .itemDetailPage.lg-details-banner .itemBackdrop {
+.layout-desktop .itemDetailPage.lg-details-banner .itemBackdrop,
+.layout-tv .itemDetailPage.lg-details-banner .itemBackdrop {
     height: var(--lg-details-hero-h);
     min-height: 28rem;
     background-size: cover;
@@ -111,15 +119,24 @@ $details-wide-query: '(min-width: 75em)';
     }
 }
 
+// TV: stock CSS hides .itemBackdrop on TV; the banner brings it back
+.layout-tv .itemDetailPage.lg-details-banner .itemBackdrop {
+    display: block;
+}
+
 // Stock poster and logo are replaced by the hero, the title block and the credits
 .layout-desktop .itemDetailPage .detailImageContainer,
-.layout-desktop .itemDetailPage .detailLogo {
+.layout-tv .itemDetailPage .detailImageContainer,
+.layout-desktop .itemDetailPage .detailLogo,
+.layout-tv .itemDetailPage .detailLogo {
     display: none !important;
 }
 
 // Containers share the page colour so the hero fades straight into the content
 .layout-desktop .itemDetailPage .detailPageWrapperContainer,
-.layout-desktop .itemDetailPage .detailPagePrimaryContainer {
+.layout-tv .itemDetailPage .detailPageWrapperContainer,
+.layout-desktop .itemDetailPage .detailPagePrimaryContainer,
+.layout-tv .itemDetailPage .detailPagePrimaryContainer {
     background-color: transparent;
 }
 
@@ -130,7 +147,7 @@ $details-wide-query: '(min-width: 75em)';
     background: none;
 }
 
-// Title logo (when the item has one). Shown on desktop at any width; hidden on mobile and TV, where the text title shows.
+// Title logo (when the item has one). Shown on desktop and TV at any width; hidden on mobile, where the text title shows.
 .lg-details-heading {
     margin-bottom: var(--lg-space-1);
     animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 0ms backwards;
@@ -151,8 +168,7 @@ $details-wide-query: '(min-width: 75em)';
     }
 }
 
-.layout-mobile .lg-details-heading,
-.layout-tv .lg-details-heading {
+.layout-mobile .lg-details-heading {
     display: none;
 }
 
@@ -221,7 +237,8 @@ $details-wide-query: '(min-width: 75em)';
 }
 
 @media #{$details-desktop-query} {
-    .layout-desktop .itemDetailPage .lg-details-summary {
+    .layout-desktop .itemDetailPage .lg-details-summary,
+    .layout-tv .itemDetailPage .lg-details-summary {
         max-width: min(36rem, 46vw);
     }
 }
@@ -337,7 +354,8 @@ $details-wide-query: '(min-width: 75em)';
 }
 
 @media #{$details-wide-query} {
-    .layout-desktop .itemDetailPage .lg-details-credits {
+    .layout-desktop .itemDetailPage .lg-details-credits,
+    .layout-tv .itemDetailPage .lg-details-credits {
         position: absolute;
         inset-inline-end: var(--lg-gutter);
         bottom: 0.5rem;
@@ -402,7 +420,8 @@ $details-wide-query: '(min-width: 75em)';
 }
 
 // Desktop ribbon: title block bottom-left on the hero, one gutter from the edge (after the phone rules it refines)
-.layout-desktop .itemDetailPage .detailRibbon {
+.layout-desktop .itemDetailPage .detailRibbon,
+.layout-tv .itemDetailPage .detailRibbon {
     position: relative;
     z-index: 1;
     display: flex;
@@ -415,11 +434,13 @@ $details-wide-query: '(min-width: 75em)';
     padding-inline: var(--lg-gutter) !important; // overrides the stock 32.45vw inset in both directions
 }
 
-.layout-desktop .itemDetailPage.lg-details-banner .detailRibbon {
+.layout-desktop .itemDetailPage.lg-details-banner .detailRibbon,
+.layout-tv .itemDetailPage.lg-details-banner .detailRibbon {
     margin-top: calc(-0.42 * var(--lg-details-hero-h));
 }
 
-.layout-desktop .itemDetailPage .detailRibbon .infoWrapper {
+.layout-desktop .itemDetailPage .detailRibbon .infoWrapper,
+.layout-tv .itemDetailPage .detailRibbon .infoWrapper {
     flex: 0 0 auto;
     width: 100%;
 }
@@ -437,7 +458,8 @@ $details-wide-query: '(min-width: 75em)';
     }
 }
 
-.layout-desktop .itemDetailPage:has(.lg-details-logo) .nameContainer .itemName:not(.parentName):not(.originalTitle) {
+.layout-desktop .itemDetailPage:has(.lg-details-logo) .nameContainer .itemName:not(.parentName):not(.originalTitle),
+.layout-tv .itemDetailPage:has(.lg-details-logo) .nameContainer .itemName:not(.parentName):not(.originalTitle) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -563,19 +585,22 @@ $details-wide-query: '(min-width: 75em)';
 }
 
 // Desktop and TV gutter: title block, sections and info grid share one left edge
-.layout-desktop .itemDetailPage .detailPagePrimaryContent {
+.layout-desktop .itemDetailPage .detailPagePrimaryContent,
+.layout-tv .itemDetailPage .detailPagePrimaryContent {
     padding-inline: var(--lg-gutter) !important;
     padding-top: var(--lg-space-5);
 }
 
-.layout-desktop .itemDetailPage .detailPageContent {
+.layout-desktop .itemDetailPage .detailPageContent,
+.layout-tv .itemDetailPage .detailPageContent {
     padding-inline: var(--lg-gutter) !important;
 }
 
 // Desktop: title block, sections and the info grid share one left edge (the gutter)
 @media #{$details-desktop-query} {
     // Two columns: content on the left, details group on the right. Anything else spans the full row.
-    .layout-desktop .itemDetailPage .detailSection {
+    .layout-desktop .itemDetailPage .detailSection,
+    .layout-tv .itemDetailPage .detailSection {
         display: grid;
         grid-template-columns: minmax(0, 40rem) minmax(0, 1fr);
         column-gap: var(--lg-space-6);
@@ -583,16 +608,20 @@ $details-wide-query: '(min-width: 75em)';
         align-items: start;
     }
 
-    .layout-desktop .itemDetailPage .detailSection > * {
+    .layout-desktop .itemDetailPage .detailSection > *,
+    .layout-tv .itemDetailPage .detailSection > * {
         grid-column: 1 / -1;
     }
 
     .layout-desktop .itemDetailPage .detailSection > .trackSelections,
-    .layout-desktop .itemDetailPage .detailSection > .detailSectionContent {
+    .layout-tv .itemDetailPage .detailSection > .trackSelections,
+    .layout-desktop .itemDetailPage .detailSection > .detailSectionContent,
+    .layout-tv .itemDetailPage .detailSection > .detailSectionContent {
         grid-column: 1;
     }
 
-    .layout-desktop .itemDetailPage .detailSection > .itemDetailsGroup {
+    .layout-desktop .itemDetailPage .detailSection > .itemDetailsGroup,
+    .layout-tv .itemDetailPage .detailSection > .itemDetailsGroup {
         grid-column: 2;
         grid-row: 1 / span 2;
     }
