@@ -11,6 +11,7 @@ import { clearBackdrop, setBackdrops } from 'components/backdrop/backdrop';
 import cardBuilder from 'components/cardbuilder/cardBuilder';
 import { buildCardImage } from 'components/cardbuilder/cardImage';
 import confirm from 'components/confirm/confirm';
+import { orderSimilarItems } from 'components/homesections/sections/recommendations';
 import imageLoader from 'components/images/imageLoader';
 import itemContextMenu from 'components/itemContextMenu';
 import itemHelper from 'components/itemHelper';
@@ -24,6 +25,7 @@ import itemShortcuts from 'components/shortcuts';
 import { AppFeature } from 'constants/appFeature';
 import { renderInfoBadgesHtml } from 'components/liquidglass/qualityBadges';
 import { applyDetailsExtras } from 'components/liquidglass/detailsInfo';
+import { createDetailsTrailer } from 'components/liquidglass/detailsTrailer';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import browser from 'scripts/browser';
@@ -32,7 +34,7 @@ import dom from 'utils/dom';
 import { download } from 'scripts/fileDownloader';
 import libraryMenu from 'scripts/libraryMenu';
 import * as userSettings from 'scripts/settings/userSettings';
-import { getPortraitShape, getSquareShape } from 'utils/card';
+import { getBackdropShape, getPortraitShape, getSquareShape } from 'utils/card';
 import Dashboard from 'utils/dashboard';
 import Events from 'utils/events';
 import { getItemBackdropImageUrl } from 'utils/jellyfin-apiclient/backdropImage';
@@ -564,7 +566,14 @@ function renderHeaderBackdrop(page, item, apiClient) {
     return hasbackdrop;
 }
 
-function reloadFromItem(instance, page, params, item, user) {
+/** Re-arms the background trailer on the banner; the banner class is set by renderBackdrop when the banner is shown. */
+function armDetailsTrailer(trailer, page, item) {
+    // The phone layout has no banner, but its .itemBackdrop strip hosts the trailer too
+    const trailerEnabled = isLiquidGlass() && (page.classList.contains('lg-details-banner') || layoutManager.mobile);
+    trailer.arm(page.querySelector('.itemBackdrop'), item, trailerEnabled);
+}
+
+function reloadFromItem(instance, page, params, item, user, trailer) {
     const apiClient = ServerConnections.getApiClient(item.ServerId);
 
     libraryMenu.setTitle('');
@@ -580,6 +589,7 @@ function reloadFromItem(instance, page, params, item, user) {
     }
 
     renderBackdrop(page, item, apiClient);
+    armDetailsTrailer(trailer, page, item);
 
     // Render the main information for the item
     renderName(item, page.querySelector('.nameContainer'), params.context);
@@ -1280,10 +1290,13 @@ function renderSimilarItems(page, item, context) {
         }
 
         similarCollapsible.classList.remove('hide');
+        const liquidGlass = isLiquidGlass();
+        const fetchLimit = liquidGlass ? 24 : 12;
+        const displayLimit = 16;
         const apiClient = ServerConnections.getApiClient(item.ServerId);
         const options = {
             userId: apiClient.getCurrentUserId(),
-            limit: 12,
+            limit: fetchLimit,
             fields: 'PrimaryImageAspectRatio,CanDelete'
         };
 
@@ -1300,8 +1313,9 @@ function renderSimilarItems(page, item, context) {
             similarCollapsible.classList.remove('hide');
             let html = '';
             html += cardBuilder.getCardsHtml({
-                items: result.Items,
-                shape: 'autooverflow',
+                items: liquidGlass ? orderSimilarItems(result.Items).slice(0, displayLimit) : result.Items,
+                shape: liquidGlass ? getBackdropShape(true) : 'autooverflow',
+                preferThumb: liquidGlass ? true : undefined,
                 showParentTitle: item.Type == 'MusicAlbum',
                 centerText: true,
                 showTitle: true,
@@ -1311,7 +1325,7 @@ function renderSimilarItems(page, item, context) {
                 coverImage: item.Type == 'MusicAlbum' || item.Type == 'MusicArtist',
                 overlayPlayButton: true,
                 overlayText: false,
-                showYear: item.Type === 'Movie' || item.Type === 'Trailer' || item.Type === 'Series'
+                showYear: liquidGlass || item.Type === 'Movie' || item.Type === 'Trailer' || item.Type === 'Series'
             });
             const similarContent = similarCollapsible.querySelector('.similarContent');
             similarContent.innerHTML = html;
@@ -1957,7 +1971,7 @@ export default function (view, params) {
 
         Promise.all([getPromise(apiClient, pageParams), apiClient.getCurrentUser()]).then(([item, user]) => {
             currentItem = item;
-            reloadFromItem(instance, page, pageParams, item, user);
+            reloadFromItem(instance, page, pageParams, item, user, detailsTrailer);
         }).catch((error) => {
             console.error('failed to get item or current user: ', error);
         });
@@ -2013,6 +2027,7 @@ export default function (view, params) {
     }
 
     function onPlayClick() {
+        detailsTrailer.cancel();
         let actionElem = this;
         let action = actionElem.getAttribute('data-action');
 
@@ -2049,6 +2064,7 @@ export default function (view, params) {
     }
 
     function onPlayTrailerClick() {
+        detailsTrailer.cancel();
         playTrailer();
     }
 
@@ -2118,6 +2134,11 @@ export default function (view, params) {
 
     let currentItem;
     const self = this;
+    const detailsTrailer = createDetailsTrailer(onPlaybackStart => {
+        const listener = () => onPlaybackStart();
+        Events.on(playbackManager, 'playbackstart', listener);
+        return () => Events.off(playbackManager, 'playbackstart', listener);
+    });
 
     function init() {
         const apiClient = getApiClient();
@@ -2150,7 +2171,8 @@ export default function (view, params) {
                 if (currentItem) {
                     libraryMenu.setTitle('');
                     renderTrackSelections(page, self, currentItem, true);
-                    renderBackdrop(page, currentItem);
+                    renderBackdrop(page, currentItem, ServerConnections.getApiClient(currentItem.ServerId));
+                    armDetailsTrailer(detailsTrailer, page, currentItem);
                 }
             } else {
                 reload(self, page, params);
@@ -2162,12 +2184,14 @@ export default function (view, params) {
             itemShortcuts.on(view.querySelector('.nameContainer'));
         });
         view.addEventListener('viewbeforehide', function () {
+            detailsTrailer.cancel();
             itemShortcuts.off(view.querySelector('.nameContainer'));
             Events.off(apiClient, 'message', onWebSocketMessage);
             Events.off(playbackManager, 'playerchange', onPlayerChange);
             libraryMenu.setTransparentMenu(false);
         });
         view.addEventListener('viewdestroy', function () {
+            detailsTrailer.dispose();
             currentItem = null;
             self._currentPlaybackMediaSources = null;
             self.currentRecordingFields = null;

@@ -8,6 +8,7 @@ import { appRouter } from '../../router/appRouter';
 import { EventType } from '../../../constants/eventType';
 import globalize from '../../../lib/globalize';
 import { renderInfoBadgesHtml } from '../../liquidglass/qualityBadges';
+import { armTrailerBackdrop, DEFAULT_DELAY_MS, getTrailerVideoId, type TrailerBackdrop } from '../../liquidglass/trailerBackdrop';
 import { isLiquidGlass, prefersReducedMotion } from '../../../themes/liquidglass/isLiquidGlass';
 import Events from '../../../utils/events';
 
@@ -24,7 +25,7 @@ const TICKS_PER_MINUTE = 600000000;
 const MAX_GENRES = 2;
 const HERO_FIELDS = 'Overview,Genres,ProductionYear,RunTimeTicks,OfficialRating,CommunityRating,'
     + 'ParentBackdropImageTags,ParentBackdropItemId,ParentLogoImageTag,ParentLogoItemId,'
-    + 'MediaSources,HasSubtitles,CriticRating,ProviderIds';
+    + 'MediaSources,HasSubtitles,CriticRating,ProviderIds,RemoteTrailers';
 
 export interface HeroController {
     destroy: () => void;
@@ -216,6 +217,11 @@ class Hero implements HeroController {
     private showToken = 0;
     private hasShown = false;
     private readonly pendingWaits = new Set<() => void>();
+    private trailer: TrailerBackdrop | undefined;
+    // True from the moment a trailer is about to load until it stops: holds auto-advance so a failed load can resume.
+    private trailerHolding = false;
+    // Bumped whenever the trailer is cancelled, so a late onPlaying/onStop from an old trailer is ignored.
+    private trailerToken = 0;
 
     constructor(
         private readonly apiClient: ApiClient,
@@ -233,6 +239,9 @@ class Hero implements HeroController {
     setPaused(paused: boolean): void {
         this.paused = paused;
         this.updateTimer();
+        // A trailer must not keep playing while the home view is hidden; it is armed again on resume.
+        if (paused) this.cancelTrailer();
+        else this.armTrailer();
     }
 
     get element(): HTMLElement {
@@ -249,6 +258,8 @@ class Hero implements HeroController {
         this.root.addEventListener('focusout', this.onFocusOut);
         document.addEventListener('visibilitychange', this.updateTimer);
         Events.on(document, EventType.THEME_CHANGE, this.onThemeChange);
+        Events.on(playbackManager, 'playbackstart', this.onPlaybackStart);
+        this.markAutofocus();
         void this.show(0);
     }
 
@@ -256,6 +267,8 @@ class Hero implements HeroController {
         if (this.destroyed) return;
         this.destroyed = true;
         this.stopTimer();
+        this.cancelTrailer();
+        Events.off(playbackManager, 'playbackstart', this.onPlaybackStart);
         // Release every pending image wait (clears its timer and listeners).
         for (const finish of [...this.pendingWaits]) finish();
         this.root.removeEventListener('click', this.onClick);
@@ -312,6 +325,7 @@ class Hero implements HeroController {
         // A newer show() supersedes this one; stale awaits are ignored via the token.
         const token = ++this.showToken;
         this.stopTimer();
+        this.cancelTrailer();
         // Freeze the progress dot while the next backdrop loads; updateTimer clears this once the slide is shown.
         this.root.classList.add('lg-hero--paused');
         await this.waitForBackdrop(target, this.hasShown ? IMAGE_TIMEOUT_MS : FIRST_IMAGE_TIMEOUT_MS);
@@ -344,6 +358,8 @@ class Hero implements HeroController {
             else dot.removeAttribute('aria-current');
         });
         this.updateTimer();
+        this.armTrailer();
+        this.markAutofocus();
     }
 
     private readonly updateTimer = (): void => {
@@ -351,7 +367,7 @@ class Hero implements HeroController {
         const eligible = this.items.length > 1 && !prefersReducedMotion() && !this.destroyed;
         // document.hidden is universally available on supported browsers; the compat rule is over-strict here.
         // eslint-disable-next-line compat/compat
-        const canRun = eligible && !document.hidden && !this.hovered && !this.focused && !this.paused;
+        const canRun = eligible && !document.hidden && !this.hovered && !this.focused && !this.paused && !this.trailerHolding;
         if (canRun) {
             this.root.classList.remove('lg-hero--paused');
             // Removing and re-adding the class after a reflow restarts the CSS progress animation in step with the timer.
@@ -373,6 +389,66 @@ class Hero implements HeroController {
     private stopTimer(): void {
         if (this.timer !== undefined) clearInterval(this.timer);
         this.timer = undefined;
+    }
+
+    /** Arms the active slide's trailer, if the item has one. It starts only after the user stays on the slide. */
+    private armTrailer(): void {
+        this.cancelTrailer();
+        const item = this.items[this.current];
+        const videoId = item ? getTrailerVideoId(item) : null;
+        const host = this.slides[this.current];
+        if (!videoId || !host || this.destroyed || this.paused || document.hidden) return;
+        const token = this.trailerToken;
+        this.trailer = armTrailerBackdrop({
+            host,
+            videoId,
+            delayMs: DEFAULT_DELAY_MS,
+            showMuteButton: true,
+            onStart: () => this.onTrailerStart(token),
+            onPlaying: () => this.onTrailerPlaying(token),
+            onStop: () => this.onTrailerStop(token)
+        });
+    }
+
+    private cancelTrailer(): void {
+        this.trailerToken += 1;
+        this.trailer?.cancel();
+        this.trailer = undefined;
+        this.trailerHolding = false;
+        this.root.classList.remove('lg-hero--trailer');
+    }
+
+    private onTrailerStart(token: number): void {
+        if (token !== this.trailerToken) return;
+        this.trailerHolding = true;
+        this.updateTimer();
+    }
+
+    private onTrailerPlaying(token: number): void {
+        if (token !== this.trailerToken) return;
+        this.root.classList.add('lg-hero--trailer');
+    }
+
+    private onTrailerStop(token: number): void {
+        if (token !== this.trailerToken) return;
+        this.trailerHolding = false;
+        this.root.classList.remove('lg-hero--trailer');
+        this.updateTimer();
+    }
+
+    private readonly onPlaybackStart = (): void => {
+        this.cancelTrailer();
+        this.updateTimer();
+    };
+
+    /** On TV, the active slide's Play button carries autofocus so focusManager.autoFocus lands on it. */
+    private markAutofocus(): void {
+        this.slides.forEach((slide, i) => {
+            const primary = slide.querySelector<HTMLElement>('.lg-hero__btn--primary');
+            if (!primary) return;
+            if (layoutManager.tv && i === this.current) primary.setAttribute('autofocus', '');
+            else primary.removeAttribute('autofocus');
+        });
     }
 
     private readonly onEnter = (): void => {
@@ -426,9 +502,11 @@ class Hero implements HeroController {
                 void this.show(Number(button.dataset.index));
                 break;
             case 'play':
+                this.cancelTrailer();
                 this.play(item);
                 break;
             case 'info':
+                this.cancelTrailer();
                 appRouter.showItem(item);
                 break;
             case 'favorite':

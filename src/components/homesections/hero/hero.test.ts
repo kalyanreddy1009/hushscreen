@@ -3,8 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const play = vi.hoisted(() => vi.fn());
 const showItem = vi.hoisted(() => vi.fn());
+const arm = vi.hoisted(() => vi.fn<(options: unknown) => { cancel: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; playing: boolean }>(() => ({ cancel: vi.fn(), destroy: vi.fn(), playing: false })));
 
 vi.mock('../../playback/playbackmanager', () => ({ playbackManager: { play } }));
+vi.mock('../../liquidglass/trailerBackdrop', async importOriginal => ({
+    ...(await importOriginal<typeof import('../../liquidglass/trailerBackdrop')>()),
+    armTrailerBackdrop: arm
+}));
 vi.mock('../../router/appRouter', () => ({ appRouter: { showItem } }));
 vi.mock('../../layoutManager', () => ({ default: { tv: false, mobile: false } }));
 vi.mock('../../mediainfo/mediainfo', () => ({
@@ -16,7 +21,21 @@ vi.mock('../../../themes/liquidglass/isLiquidGlass', () => ({
     prefersReducedMotion: () => false
 }));
 
-import { destroyHero, mountHero } from './hero';
+import layoutManager from '../../layoutManager';
+import Events from '../../../utils/events';
+import { playbackManager } from '../../playback/playbackmanager';
+
+import { destroyHero, mountHero, pauseHero } from './hero';
+
+interface ArmOptions {
+    host: HTMLElement;
+    videoId: string;
+    delayMs: number;
+    showMuteButton: boolean;
+    onStart: () => void;
+    onPlaying: () => void;
+    onStop: () => void;
+}
 
 function flush(): Promise<void> {
     return new Promise(resolve => {
@@ -330,5 +349,202 @@ describe('hero backdrop readiness', () => {
         decodes.get('/img/c')?.resolve();
         await flush();
         expect(activeId()).toBe('c');
+    });
+});
+
+describe('hero trailer and TV focus', () => {
+    const TRAILER_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    const VIDEO_ID = 'dQw4w9WgXcQ';
+    const TRAILER_DELAY_MS = 7000;
+    const AUTO_ADVANCE_MS = 8000;
+    let container: HTMLElement;
+
+    function trailerItem(id: string): BaseItemDto {
+        return makeItem(id, { RemoteTrailers: [{ Url: TRAILER_URL }] });
+    }
+
+    function activeSlide(): HTMLElement {
+        const slide = container.querySelector<HTMLElement>('.lg-hero__slide.is-active');
+        if (!slide) throw new Error('no active slide');
+        return slide;
+    }
+
+    function armOptions(index = 0): ArmOptions {
+        const options = arm.mock.calls[index]?.[0] as ArmOptions | undefined;
+        if (!options) throw new Error('armTrailerBackdrop was not called');
+        return options;
+    }
+
+    function trailerAt(index = 0): { cancel: ReturnType<typeof vi.fn> } {
+        const trailer = arm.mock.results[index]?.value;
+        if (!trailer) throw new Error('no trailer was armed');
+        return trailer;
+    }
+
+    beforeEach(() => {
+        container = document.createElement('div');
+        document.body.append(container);
+        Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+            configurable: true,
+            value: () => Promise.resolve()
+        });
+        layoutManager.tv = false;
+    });
+
+    afterEach(() => {
+        destroyHero(container);
+        container.remove();
+        Reflect.deleteProperty(HTMLImageElement.prototype, 'decode');
+        layoutManager.tv = false;
+        vi.useRealTimers();
+        vi.clearAllMocks();
+    });
+
+    it('requests RemoteTrailers so a trailer can be found', async () => {
+        const client = makeClient([makeItem('a')]) as unknown as { getLatestItems: ReturnType<typeof vi.fn> };
+        await mountHero(container, client as never);
+        expect(client.getLatestItems.mock.calls[0][0].Fields).toContain('RemoteTrailers');
+    });
+
+    it('arms a 7 second trailer on the active slide when the item has a YouTube trailer', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+
+        expect(arm).toHaveBeenCalledTimes(1);
+        const options = armOptions();
+        expect(options.host).toBe(activeSlide());
+        expect(options.videoId).toBe(VIDEO_ID);
+        expect(options.delayMs).toBe(TRAILER_DELAY_MS);
+        expect(options.showMuteButton).toBe(true);
+    });
+
+    it('does not arm a trailer when the item has no YouTube trailer', async () => {
+        await mountHero(container, makeClient([makeItem('a', { RemoteTrailers: [{ Url: 'https://vimeo.com/1' }] })]));
+        await flush();
+
+        expect(arm).not.toHaveBeenCalled();
+    });
+
+    it('cancels the trailer and arms the new slide when the slide changes', async () => {
+        await mountHero(container, makeClient([trailerItem('a'), trailerItem('b')]));
+        await flush();
+        container.querySelector<HTMLElement>('[data-action="next"]')?.click();
+        await flush();
+
+        expect(trailerAt(0).cancel).toHaveBeenCalled();
+        expect(arm).toHaveBeenCalledTimes(2);
+        expect(armOptions(1).host).toBe(activeSlide());
+    });
+
+    it('holds auto-advance from the trailer start, marks the hero once it plays, and resumes when it stops', async () => {
+        vi.useFakeTimers();
+        const mounted = mountHero(container, makeClient([trailerItem('a'), makeItem('b')]));
+        await vi.advanceTimersByTimeAsync(0);
+        await mounted;
+        await vi.advanceTimersByTimeAsync(0);
+        expect(activeSlide().dataset.id).toBe('a');
+        const hero = container.querySelector<HTMLElement>('.lg-hero');
+
+        armOptions().onStart();
+        await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS);
+        expect(activeSlide().dataset.id).toBe('a');
+        expect(hero?.classList.contains('lg-hero--paused')).toBe(true);
+        expect(hero?.classList.contains('lg-hero--trailer')).toBe(false);
+
+        armOptions().onPlaying();
+        expect(hero?.classList.contains('lg-hero--trailer')).toBe(true);
+
+        armOptions().onStop();
+        expect(hero?.classList.contains('lg-hero--trailer')).toBe(false);
+        await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS);
+        expect(activeSlide().dataset.id).toBe('b');
+    });
+
+    it('resumes auto-advance when the trailer stops before it plays', async () => {
+        vi.useFakeTimers();
+        const mounted = mountHero(container, makeClient([trailerItem('a'), makeItem('b')]));
+        await vi.advanceTimersByTimeAsync(0);
+        await mounted;
+        await vi.advanceTimersByTimeAsync(0);
+
+        armOptions().onStart();
+        armOptions().onStop();
+        await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS);
+
+        expect(activeSlide().dataset.id).toBe('b');
+    });
+
+    it('cancels the trailer before Play starts playback', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        container.querySelector<HTMLElement>('[data-action="play"]')?.click();
+
+        const cancelOrder = trailerAt().cancel.mock.invocationCallOrder[0];
+        expect(cancelOrder).toBeLessThan(play.mock.invocationCallOrder[0]);
+    });
+
+    it('cancels the trailer before Info opens the item', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        container.querySelector<HTMLElement>('[data-action="info"]')?.click();
+
+        const cancelOrder = trailerAt().cancel.mock.invocationCallOrder[0];
+        expect(cancelOrder).toBeLessThan(showItem.mock.invocationCallOrder[0]);
+    });
+
+    it('cancels the trailer when playback starts', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        Events.trigger(playbackManager, 'playbackstart', []);
+
+        expect(trailerAt().cancel).toHaveBeenCalled();
+    });
+
+    it('cancels the trailer when the hero is paused', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        pauseHero(container);
+
+        expect(trailerAt().cancel).toHaveBeenCalled();
+    });
+
+    it('cancels the trailer on destroy and stops listening for playback', async () => {
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        const offSpy = vi.spyOn(Events, 'off');
+        destroyHero(container);
+
+        expect(trailerAt().cancel).toHaveBeenCalled();
+        expect(offSpy).toHaveBeenCalledWith(playbackManager, 'playbackstart', expect.any(Function));
+    });
+
+    it('marks only the active slide Play button autofocus on TV', async () => {
+        layoutManager.tv = true;
+        await mountHero(container, makeClient([makeItem('a'), makeItem('b')]));
+        await flush();
+
+        const primaries = Array.from(container.querySelectorAll<HTMLElement>('.lg-hero__btn--primary'));
+        expect(primaries[0].hasAttribute('autofocus')).toBe(true);
+        expect(primaries[1].hasAttribute('autofocus')).toBe(false);
+        expect(activeSlide().querySelector('.lg-hero__btn--primary')).toBe(primaries[0]);
+    });
+
+    it('moves autofocus to the new active Play button when the slide changes on TV', async () => {
+        layoutManager.tv = true;
+        await mountHero(container, makeClient([makeItem('a'), makeItem('b')]));
+        await flush();
+        container.querySelector<HTMLElement>('[data-action="next"]')?.click();
+        await flush();
+
+        const primaries = Array.from(container.querySelectorAll<HTMLElement>('.lg-hero__btn--primary'));
+        expect(primaries[0].hasAttribute('autofocus')).toBe(false);
+        expect(primaries[1].hasAttribute('autofocus')).toBe(true);
+    });
+
+    it('sets no autofocus when not on TV', async () => {
+        await mountHero(container, makeClient([makeItem('a'), makeItem('b')]));
+        await flush();
+
+        expect(container.querySelector('[autofocus]')).toBeNull();
     });
 });

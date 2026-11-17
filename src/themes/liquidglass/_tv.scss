@@ -1,0 +1,236 @@
+// tv — 10-foot (layout-tv) polish: focus lift, glass header, full-bleed hero, row rhythm.
+// Loaded after the screen partials so it can refine them for TV only.
+// Every selector is scoped to .layout-tv (html.layout-tv where a stock rule needs the extra weight).
+@use 'mixins' as *;
+
+$tv-focus-scale: 1.1; // tvOS lift for cards and details buttons
+$tv-hero-btn-scale: 1.08;
+$tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+
+// ---------------------------------------------------------------------------
+// 1. Header: transparent top scrim instead of a solid bar; glass pill for tabs
+// ---------------------------------------------------------------------------
+// Replaces the background, border and shadow of the header for every header state (plain, condensed, backdrop).
+.layout-tv .skinHeader,
+.layout-tv .skinHeader.lg-header-condensed,
+.layout-tv .skinHeader.semiTransparent.lg-header-condensed {
+    background: linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.9) 0%, rgba(var(--lg-bg-rgb), 0.55) 55%, transparent 100%);
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.layout-tv .skinHeader .emby-tab-button {
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text-secondary);
+}
+
+// Selected tab: glass pill (clear), primary text and weight; the underline from _nav.scss is dropped
+.layout-tv .skinHeader .emby-tab-button-active {
+    color: var(--lg-text);
+    font-weight: 600;
+
+    @include glass(clear, false);
+}
+
+// Stock focus scales tabs 1.3x and clears their background with !important (emby-tabs.scss), which would
+// hide the pill. The !important is needed to beat that rule; focus shows as the glass pill instead.
+.layout-tv .skinHeader .emby-tab-button.show-focus:focus {
+    transform: none !important;
+    background-color: var(--lg-glass-clear-fill) !important;
+    background-image: var(--lg-glass-sheen) !important;
+    color: var(--lg-text);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Full-bleed hero (home), first row peeks below it, hero buttons lift on focus
+// ---------------------------------------------------------------------------
+// Same reason as the desktop rule in _hero.scss: the artwork runs under the transparent header.
+.layout-tv #indexPage.homePage:has(.pageTabContent.is-active .lg-hero) {
+    padding-top: 0 !important;
+}
+
+.layout-tv .lg-hero {
+    --lg-hero-height: 82vh;
+}
+
+.layout-tv .lg-hero__content {
+    padding-bottom: var(--lg-space-6);
+}
+
+.layout-tv .lg-hero__btn {
+    position: relative;
+    transition:
+        transform var(--lg-dur-spring) var(--lg-ease-spring),
+        background-color var(--lg-dur-focus) var(--lg-ease-out);
+
+    // Soft glow behind the focused button (opacity fades; no ring)
+    &::after {
+        content: '';
+        position: absolute;
+        inset: -8px;
+        border-radius: inherit;
+        box-shadow: 0 0 32px 6px rgba(255, 255, 255, 0.28);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--lg-dur-focus) var(--lg-ease-out);
+    }
+}
+
+// Focus: scale + glow replace the outline ring. The primary button keeps its accent fill.
+.layout-tv .lg-hero__btn:focus:not(:active) {
+    transform: scale($tv-hero-btn-scale);
+    outline: none;
+    box-shadow: none;
+}
+
+.layout-tv .lg-hero__btn:focus:not(:active)::after {
+    opacity: 1;
+}
+
+.layout-tv .lg-hero__btn--info:focus:not(:active),
+.layout-tv .lg-hero__btn--circle:focus:not(:active) {
+    background-color: rgba(255, 255, 255, 0.28);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Card focus: tvOS lift on the card box, shadow layer fades in beneath
+// ---------------------------------------------------------------------------
+// Visual tokens: the lift is the card box's transform, so artwork and footer move together.
+html.layout-tv .card .cardBox {
+    transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+}
+
+// Stock lift on the artwork (_cards.scss) is cancelled on TV so it does not double-scale, and its
+// box-shadow transition is removed (shadows never transition; the shadow layer below fades instead).
+html.layout-tv .card .cardScalable {
+    transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+}
+
+// :has() rules sit in their own lists: engines without :has() drop a whole selector list, which would
+// otherwise take the plain :focus rule with it (see _cards.scss:167).
+html.layout-tv .card:focus .cardBox {
+    transform: scale($tv-focus-scale) translateZ(0);
+}
+
+html.layout-tv .card:has(:focus-visible) .cardBox {
+    transform: scale($tv-focus-scale) translateZ(0);
+}
+
+html.layout-tv .card:focus .cardBox:not(.visualCardBox) .cardScalable {
+    transform: none;
+    // Shadow sits on the artwork only (a card-wide layer also shadowed the title block and read as a
+    // grey panel). It switches without a transition; the spring lift carries the change.
+    box-shadow: $tv-card-shadow;
+    outline: none;
+}
+
+html.layout-tv .card:has(:focus-visible) .cardBox:not(.visualCardBox) .cardScalable {
+    transform: none;
+    box-shadow: $tv-card-shadow;
+    outline: none;
+}
+
+// Text: secondary at rest, primary on focus; footer drops below the scaled artwork
+html.layout-tv .card .cardText {
+    color: var(--lg-text-secondary);
+}
+
+html.layout-tv .card .cardFooter {
+    transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+}
+
+html.layout-tv .card:focus .cardText {
+    color: var(--lg-text);
+}
+
+html.layout-tv .card:focus .cardFooter {
+    transform: translateY(0.35em);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Row rhythm
+// ---------------------------------------------------------------------------
+.layout-tv .sectionTitle {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: var(--lg-track-display);
+    margin-bottom: var(--lg-space-3);
+}
+
+.layout-tv .verticalSection {
+    margin-bottom: var(--lg-space-6);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Details page buttons: tvOS focus (icon buttons invert to white, Play keeps its accent fill)
+// ---------------------------------------------------------------------------
+.layout-tv .itemDetailPage .mainDetailButtons .detailButton {
+    transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+}
+
+.layout-tv .itemDetailPage .mainDetailButtons .detailButton:focus:not(:active) {
+    transform: scale($tv-focus-scale);
+}
+
+// `background` shorthand also clears the base dim/sheen image stack
+.layout-tv .itemDetailPage .mainDetailButtons .detailButton:focus:not(:active):not(.btnPlay) {
+    background: var(--lg-text);
+    color: #000;
+}
+
+// ---------------------------------------------------------------------------
+// 9. Reduced motion: keep the focus scale and state change, make them instant
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+    html.layout-tv .card .cardBox,
+    html.layout-tv .card .cardScalable,
+    html.layout-tv .card .cardFooter {
+        transition-duration: 1ms;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 5. Smooth motion (only where motion is allowed)
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: no-preference) {
+    @keyframes lg-tv-page-in {
+        from {
+            opacity: 0;
+            transform: scale(0.985);
+        }
+    }
+
+    // Page arrival: a short scale-up on top of the opacity fade from _motion.scss
+    .layout-tv .mainAnimatedPage:not(.hide) {
+        animation: lg-tv-page-in 420ms var(--lg-ease-out) backwards;
+    }
+
+    // Remote scrolling eases instead of jumping (scroller and scrollY call scrollTo without a behavior)
+    .layout-tv .emby-scroller,
+    .layout-tv .scrollY,
+    html.layout-tv {
+        scroll-behavior: smooth;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7. High contrast: focus never relies on the shadow alone
+// ---------------------------------------------------------------------------
+// The stock card box sets outline: none with !important (card.scss), so the visual card ring needs !important too.
+@media (prefers-contrast: more) {
+    html.layout-tv .card:focus .cardBox:not(.visualCardBox) .cardScalable {
+        outline: 3px solid var(--lg-text);
+        outline-offset: 4px;
+    }
+
+    html.layout-tv .card:has(:focus-visible) .cardBox:not(.visualCardBox) .cardScalable {
+        outline: 3px solid var(--lg-text);
+        outline-offset: 4px;
+    }
+
+    html.layout-tv .card:focus .cardBox.visualCardBox {
+        outline: 3px solid var(--lg-text) !important;
+        outline-offset: 4px;
+    }
+}

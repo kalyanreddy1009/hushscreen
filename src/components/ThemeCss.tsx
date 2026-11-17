@@ -7,7 +7,9 @@ interface ThemeCssProps {
     dashboard?: boolean
 }
 
-const getThemeUrl = (id: string) => `themes/${id}/theme.css`;;
+// theme.css has no content hash in its file name; the build stamp keeps browsers from reusing a cached
+// stylesheet from an older build alongside the new (hashed) script bundles.
+const getThemeUrl = (id: string) => `themes/${id}/theme.css?v=${__BUILD_TIMESTAMP__}`;
 
 const DEFAULT_THEME_URL = getThemeUrl(getDefaultTheme().id);
 

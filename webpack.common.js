@@ -56,6 +56,9 @@ const config = {
     },
     plugins: [
         new DefinePlugin({
+            // Changes every build: appended to the unhashed theme stylesheet URL so browsers never pair
+            // new bundles with a cached theme.css
+            __BUILD_TIMESTAMP__: JSON.stringify(String(Date.now())),
             __COMMIT_SHA__: JSON.stringify(COMMIT_SHA),
             __JF_BUILD_VERSION__: JSON.stringify(
                 process.env.WEBPACK_SERVE ?

@@ -14,6 +14,12 @@ import { LibraryTab } from 'types/libraryTab';
 import { getBackdropShape, getPortraitShape } from 'utils/card';
 import Dashboard from 'utils/dashboard';
 import Events from 'utils/events';
+import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
+import {
+    loadRecommendationRows,
+    resumeRecommendationRows,
+    startLatestRequest
+} from 'components/homesections/sections/recommendations';
 
 import 'elements/emby-scroller/emby-scroller';
 import 'elements/emby-itemscontainer/emby-itemscontainer';
@@ -149,7 +155,39 @@ function getRecommendationHtml(recommendation) {
     return html;
 }
 
+const LIQUID_GLASS_SIMILAR_ROW_LIMIT = 6;
+
+/**
+ * Liquid Glass: reuses the home recommendation rows. Rows load into a detached container and replace the
+ * live rows only if no newer load of the tab has started, so re-entering the tab cannot duplicate them.
+ */
+function loadLiquidGlassSuggestions(page, userId) {
+    const recs = page.querySelector('.recommendations');
+    const isLatestLoad = startLatestRequest(recs);
+    const staging = document.createElement('div');
+
+    loadRecommendationRows(staging, ApiClient, userId, { maxSimilarRows: LIQUID_GLASS_SIMILAR_ROW_LIMIT })
+        .then(function () {
+            if (!isLatestLoad()) return undefined;
+
+            recs.innerHTML = '';
+            recs.append(...Array.from(staging.childNodes));
+            page.querySelector('.noItemsMessage').classList.toggle('hide', recs.querySelector('.lg-rec-section') !== null);
+            return resumeRecommendationRows(recs).then(function () {
+                autoFocus(page);
+            });
+        })
+        .catch(function (err) {
+            console.error('[suggestions] failed to load recommendations', err);
+        });
+}
+
 function loadSuggestions(page, userId) {
+    if (isLiquidGlass()) {
+        loadLiquidGlassSuggestions(page, userId);
+        return;
+    }
+
     const screenWidth = dom.getWindowSize().innerWidth;
     let itemLimit = 5;
     if (screenWidth >= 1600) {

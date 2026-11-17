@@ -14,6 +14,7 @@ import { loadLibraryTiles } from './sections/libraryTiles';
 import { loadLiveTV } from './sections/liveTv';
 import { loadNextUp } from './sections/nextUp';
 import { loadRecentlyAdded } from './sections/recentlyAdded';
+import { loadRecommendationRows, resumeRecommendationRows } from './sections/recommendations';
 import { loadResume } from './sections/resume';
 
 import 'elements/emby-button/paper-icon-button-light';
@@ -83,6 +84,8 @@ export function loadSections(elem, apiClient, user, userSettings) {
                 for (let i = 0; i < sections.length; i++) {
                     promises.push(loadSection(elem, apiClient, user, userSettings, userViews, sections, i));
                 }
+                // Not awaited: the recommendation rows must not hold up the home sections.
+                void loadLiquidGlassRecommendations(elem, sections, apiClient);
 
                 return Promise.all(promises)
                 // Timeout for polyfilled CustomElements (webOS 1.2)
@@ -149,6 +152,25 @@ export function resume(elem, options) {
     });
 
     return Promise.all(promises);
+}
+
+/**
+ * Liquid Glass only: inserts personalised recommendation rows before the latest-media section
+ * (or at the end when that section is not shown). Stock themes return early and are unchanged.
+ */
+function loadLiquidGlassRecommendations(elem, sections, apiClient) {
+    if (!isLiquidGlass()) return Promise.resolve();
+
+    const container = document.createElement('div');
+    container.classList.add('lg-recommendations');
+
+    const latestIndex = sections.indexOf(HomeSectionType.LatestMedia);
+    const anchor = latestIndex === -1 ? null : elem.querySelector('.section' + latestIndex);
+    elem.insertBefore(container, anchor);
+
+    return loadRecommendationRows(container, apiClient, apiClient.getCurrentUserId())
+        .then(() => resumeRecommendationRows(container))
+        .catch(err => console.error('[recommendations] failed to load rows', err));
 }
 
 function loadSection(page, apiClient, user, userSettings, userViews, allSections, index) {

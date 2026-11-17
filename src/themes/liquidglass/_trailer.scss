@@ -1,0 +1,148 @@
+// trailer — Background trailer layer (src/components/liquidglass/trailerBackdrop.ts) that blends into the artwork.
+@use 'mixins' as *;
+
+// Animates opacity and transform only. The layer starts slightly zoomed in, so the reveal reads as the
+// backdrop image starting to move rather than a video box laid on top.
+.lg-trailer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(1.04);
+    transition:
+        opacity 1600ms var(--lg-ease-out),
+        transform 2400ms var(--lg-ease-out);
+    container-type: size;
+}
+
+.lg-trailer--playing {
+    opacity: 1;
+    transform: scale(1);
+}
+
+// Sits just under the artwork's tone so the motion does not outshine the still image
+.lg-trailer iframe {
+    filter: saturate(0.92) brightness(0.92);
+}
+
+// Fallback for engines without container query units: fill the layer edge to edge.
+.lg-trailer iframe,
+.lg-trailer__frame {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+// Scales the 16:9 video to cover the layer; the 1.12 scale crops YouTube's edge chrome.
+@supports (width: 1cqw) {
+    .lg-trailer iframe,
+    .lg-trailer__frame {
+        top: 50%;
+        left: 50%;
+        width: max(100cqw, 177.78cqh);
+        height: max(56.25cqw, 100cqh);
+        transform: translate(-50%, -50%) scale(1.12);
+    }
+}
+
+// No mask and full opacity: the video replaces the still artwork rather than mixing with it (a mask or partial
+// opacity lets the still show through and reads as a double exposure). Edges blend through the host's own
+// gradient layers, which are ::after pseudo-elements painted above this layer (_details.scss, _hero.scss), so
+// the moving image dissolves into the page exactly as the still one does.
+
+// Circular glass control, placed under the header. The 44px hit target holds a 36px glass disc.
+// The transition merges the press feedback from the mixin with the opacity fade so neither overrides the other.
+.lg-trailer__mute {
+    @include hit-target;
+    @include focus-ring(var(--lg-radius-pill));
+    @include press;
+    display: grid;
+    place-items: center;
+    width: var(--lg-hit-min);
+    height: var(--lg-hit-min);
+    padding: 0;
+    border: 0;
+    border-radius: var(--lg-radius-pill);
+    background: none;
+    color: var(--lg-text);
+    cursor: pointer;
+    position: absolute;
+    top: calc(var(--lg-space-6) + 3.5rem);
+    inset-inline-end: var(--lg-gutter);
+    z-index: 2;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        transform var(--lg-dur-micro) var(--lg-ease-out),
+        opacity var(--lg-dur-glass) var(--lg-ease-out);
+
+    &::before {
+        @include glass(clear, false);
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: inherit;
+        background-color: rgba(0, 0, 0, 0.28);
+    }
+
+    // Positioned so it paints above the disc; a static icon would sit underneath it
+    .material-icons {
+        position: relative;
+        font-size: 1.25rem;
+        opacity: 0.8;
+        transition: opacity var(--lg-dur-micro) var(--lg-ease-out);
+    }
+
+    &:hover .material-icons,
+    &:focus-visible .material-icons {
+        opacity: 1;
+    }
+}
+
+.lg-trailer__mute--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lg-trailer {
+        transition-duration: 1ms;
+    }
+}
+
+// Hero: above the backdrop image, below the bottom gradient and the content (content is z-index 1 in _hero.scss).
+// Zero rather than 1: the overlay is appended after the content, so an equal z-index would paint it over the text.
+.lg-hero__slide .lg-trailer {
+    z-index: 0;
+}
+
+// The hero mute control sits on the action row (Play, Info) rather than at the top edge, so it stays in view.
+// Content bottom padding is --lg-space-6 and the action buttons are --lg-hit-min tall, the same as the control,
+// so both share one centre line.
+.lg-hero__slide .lg-trailer__mute {
+    top: auto;
+    bottom: var(--lg-space-6);
+}
+
+// Phone strip: the mute control sits in the strip's bottom-right corner
+.layout-mobile .itemBackdrop .lg-trailer__mute {
+    top: auto;
+    bottom: var(--lg-space-3);
+    inset-inline-end: var(--lg-space-3);
+}
+
+// tvOS dims the hero copy while the preview plays; logo, meta and buttons stay.
+.lg-hero--trailer .lg-hero__overview {
+    opacity: 0;
+    transition: opacity var(--lg-dur-glass) var(--lg-ease-out);
+}
+
+// TV card: the trailer covers the card artwork and follows its rounded corners.
+.layout-tv .card .cardScalable .lg-trailer {
+    z-index: 1;
+    border-radius: inherit;
+}

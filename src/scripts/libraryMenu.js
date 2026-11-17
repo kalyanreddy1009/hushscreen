@@ -32,6 +32,7 @@ import datetime from '../scripts/datetime';
 import { initBottomTabBar } from '../components/liquidglass/bottomTabBar';
 import { initHeaderScroll } from '../components/liquidglass/headerScroll';
 import { initCardTilt } from '../components/liquidglass/cardTilt';
+import { initTvCardTrailer } from '../components/liquidglass/tvCardTrailer';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -861,6 +862,7 @@ loadNavDrawer();
 initHeaderScroll();
 initBottomTabBar({ openLibraries: openMainDrawer });
 initCardTilt();
+initTvCardTrailer();
 
 const LibraryMenu = {
     getTopParentId,
