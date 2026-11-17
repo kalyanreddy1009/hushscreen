@@ -1,0 +1,318 @@
+// motion — The Liquid Glass motion layer: entrances, scroll-driven reveals, hero cinematics, state pops.
+// Loaded last so it can add animation to elements styled by the other partials.
+//
+// Rules this file keeps (apple-design-motion: "Animate transform and opacity"; "Reduced motion
+// doesn't mean no feedback"):
+// - Only transform / opacity / the individual `translate` + `scale` properties animate. No layout.
+// - Every entrance uses `backwards` fill, so once it ends the element carries no animated value
+//   (no lingering stacking contexts or containing blocks for fixed descendants).
+// - Anything that moves sits inside `prefers-reduced-motion: no-preference`; reduced motion keeps
+//   only opacity cross-fades.
+// - Scroll-driven reveals only run where `animation-timeline` exists; elsewhere content is simply there.
+
+$stagger-step: 40ms;
+$stagger-count: 12;
+
+// ---------------------------------------------------------------------------
+// Keyframes
+// ---------------------------------------------------------------------------
+@keyframes lg-fade-in {
+    from { opacity: 0; }
+}
+
+@keyframes lg-rise {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 18px, 0);
+    }
+}
+
+@keyframes lg-rise-scale {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 28px, 0) scale(0.97);
+    }
+}
+
+@keyframes lg-image-settle {
+    from {
+        opacity: 0;
+        transform: scale(1.08);
+    }
+}
+
+@keyframes lg-pop-in {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    60% {
+        opacity: 1;
+        transform: scale(1.06);
+    }
+}
+
+// Heart / check: a quick squash-and-stretch that settles without a second wobble
+@keyframes lg-pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.32); }
+    65% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+}
+
+@keyframes lg-tab-bounce {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    40% { transform: translate3d(0, -3px, 0) scale(1.16); }
+    100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes lg-grow-x {
+    from { transform: scaleX(0); }
+}
+
+@keyframes lg-hero-progress {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+@keyframes lg-hero-parallax {
+    to { translate: 0 22%; }
+}
+
+@keyframes lg-hero-content-out {
+    to {
+        opacity: 0;
+        translate: 0 -32px;
+    }
+}
+
+@keyframes lg-reveal {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 40px, 0) scale(0.98);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 1. Page arrival: every view cross-fades in (opacity only, so it also runs under reduced motion)
+// ---------------------------------------------------------------------------
+.mainAnimatedPage:not(.hide) {
+    animation: lg-fade-in var(--lg-dur-page) var(--lg-ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    // -----------------------------------------------------------------------
+    // 2. Rails and lists: items cascade in, left to right, as their row loads
+    // -----------------------------------------------------------------------
+    // Capped at the first $stagger-count items (later ones are off-screen in a rail) and skipped on
+    // TV layouts, whose browsers are often low-end. Grids and lists use the scroll-driven reveal (§9)
+    // where it exists; this timed cascade is only their fallback.
+    @for $i from 1 through $stagger-count {
+        html:not(.layout-tv) .scrollSlider > .card:nth-child(#{$i}) {
+            animation: lg-rise 480ms var(--lg-ease-out) #{$stagger-step * ($i - 1)} backwards;
+        }
+    }
+
+    @supports not (animation-timeline: view()) {
+        @for $i from 1 through $stagger-count {
+            html:not(.layout-tv) .itemsContainer.vertical-wrap > .card:nth-child(#{$i}),
+            html:not(.layout-tv) .itemsContainer.vertical-list > .listItem:nth-child(#{$i}) {
+                animation: lg-rise 480ms var(--lg-ease-out) #{$stagger-step * ($i - 1)} backwards;
+            }
+        }
+    }
+
+    // Home rows rise in one after another on first paint
+    @for $i from 0 through 9 {
+        .homeSectionsContainer > .section#{$i} {
+            animation: lg-rise-scale 560ms var(--lg-ease-out) #{60ms * $i} backwards;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Artwork settles: images arrive with a slight zoom-out instead of a flat fade
+    //    (overrides the stock 0.5s `fadein` set by imageLoader.js; TV keeps the stock fade)
+    // -----------------------------------------------------------------------
+    html:not(.layout-tv) .cardImageContainer.lazy-image-fadein {
+        animation: lg-image-settle 700ms var(--lg-ease-out) backwards;
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Home hero cinematics
+    // -----------------------------------------------------------------------
+    // Ken Burns: each slide's art eases from a slight zoom to rest while it is on screen. A transition
+    // (not a keyframe) so the outgoing slide eases back from wherever it is instead of snapping.
+    .lg-hero__backdrop {
+        scale: 1.07;
+        transition: scale calc(var(--lg-hero-interval, 8000ms) + 2000ms) linear;
+    }
+
+    .lg-hero:not(.lg-hero--pending) .lg-hero__slide.is-active .lg-hero__backdrop {
+        scale: 1;
+    }
+
+    // Copy on the incoming slide rises in, line by line
+    .lg-hero:not(.lg-hero--pending) .lg-hero__slide.is-active .lg-hero__content > * {
+        animation: lg-rise 640ms var(--lg-ease-out) backwards;
+    }
+
+    @for $i from 1 through 6 {
+        .lg-hero:not(.lg-hero--pending) .lg-hero__slide.is-active .lg-hero__content > :nth-child(#{$i}) {
+            animation-delay: #{120ms + 70ms * ($i - 1)};
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. State changes: favourite, played, checkbox, tab selection, badges
+    // -----------------------------------------------------------------------
+    // Scoped to the details action row and the hero: these are persistent state classes, so on cards
+    // and settings lists they would replay on every render.
+    .mainDetailButtons .ratingbutton-icon-withrating,
+    .mainDetailButtons .playstatebutton-icon-played,
+    .lg-hero__fav[aria-pressed='true'] .material-icons {
+        animation: lg-pop 420ms var(--lg-ease-out);
+    }
+
+    .lg-tabbar-item[aria-current='page'] .lg-tabbar-icon {
+        animation: lg-tab-bounce 420ms var(--lg-ease-out);
+    }
+
+    .itemMiscInfo .lg-badge {
+        animation: lg-pop-in 420ms var(--lg-ease-out) backwards;
+    }
+
+    @for $i from 1 through 8 {
+        .itemMiscInfo .lg-badge:nth-child(#{$i}) {
+            animation-delay: #{200ms + 50ms * ($i - 1)};
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Progress fills grow from their start edge
+    // -----------------------------------------------------------------------
+    .itemProgressBarForeground,
+    .lg-hero__progress > span {
+        transform-origin: left center;
+        animation: lg-grow-x 900ms var(--lg-ease-out) 250ms backwards;
+
+        [dir='rtl'] & {
+            transform-origin: right center;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. Hover response on pointer devices: primary actions swell slightly
+    // -----------------------------------------------------------------------
+    @media (hover: hover) and (pointer: fine) {
+        .detailButton,
+        .lg-hero__btn,
+        .lg-tabbar-item {
+            transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+        }
+
+        // Press feedback stays fast even though the hover swell uses the spring
+        .detailButton:active,
+        .lg-hero__btn:active,
+        .lg-tabbar-item:active {
+            transition-duration: var(--lg-dur-micro);
+        }
+
+        .detailButton:hover:not(:active),
+        .lg-hero__btn:hover:not(:active) {
+            transform: scale(1.06);
+        }
+    }
+}
+
+// Pointer tilt (cardTilt.ts adds .lg-tilting): the transform follows the cursor closely; the
+// spring still carries the lift on enter and the settle on leave.
+.cardScalable.lg-tilting,
+.cardBox.visualCardBox.lg-tilting {
+    transition-duration: 90ms, var(--lg-dur-focus);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Hero pager: the active dot stretches into a pill and fills over the auto-advance interval
+//    (hero.ts toggles .lg-hero--running and sets --lg-hero-interval). Not motion-gated: the timer
+//    itself never runs under reduced motion, so the fill never animates there.
+// ---------------------------------------------------------------------------
+.lg-hero__dot > span {
+    position: relative;
+    width: 24px;
+    overflow: hidden;
+    clip-path: inset(0 8px round var(--lg-radius-pill));
+    transition:
+        clip-path var(--lg-dur-panel) var(--lg-ease-spring),
+        background-color var(--lg-dur-glass) var(--lg-ease-out);
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--lg-text);
+        transform: scaleX(0);
+        transform-origin: left center;
+
+        [dir='rtl'] & {
+            transform-origin: right center;
+        }
+    }
+}
+
+.lg-hero__dot[aria-current='true'] > span {
+    clip-path: inset(0 0 round var(--lg-radius-pill));
+    background: rgba(255, 255, 255, 0.32);
+    transform: none;
+
+    &::after {
+        transform: scaleX(1);
+    }
+}
+
+.lg-hero--running .lg-hero__dot[aria-current='true'] > span::after {
+    animation: lg-hero-progress var(--lg-hero-interval, 8000ms) linear both;
+}
+
+// Hover / focus / hidden tab / slide loading: the fill holds where it is (hero.ts restarts it on resume)
+.lg-hero--paused .lg-hero__dot[aria-current='true'] > span::after {
+    animation-play-state: paused;
+}
+
+// ---------------------------------------------------------------------------
+// 9. Scroll-driven depth (Chromium 115+, Safari 26+; skipped elsewhere)
+// ---------------------------------------------------------------------------
+@supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+        // Hero art drifts slower than the page and the copy lifts away as you scroll past it.
+        // `translate` composes with the Ken Burns `scale`; the slide's bottom gradient stays put.
+        .lg-hero__backdrop {
+            animation: lg-hero-parallax linear both;
+            animation-timeline: scroll(root block);
+            animation-range: 0 100vh;
+        }
+
+        .lg-hero__content {
+            animation: lg-hero-content-out linear both;
+            animation-timeline: scroll(root block);
+            animation-range: 0 60vh;
+        }
+
+        // Library grids and lists reveal as they scroll into view (replaces the timed cascade there)
+        .itemsContainer.vertical-wrap > .card,
+        .itemsContainer.vertical-list > .listItem {
+            animation: lg-reveal linear backwards;
+            animation-timeline: view();
+            animation-range: entry 0% entry 70%;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 10. Reduced motion: keep comprehension-aiding fades, drop everything spatial
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+    .lg-hero__dot > span {
+        transition: background-color var(--lg-dur-glass) linear;
+    }
+}

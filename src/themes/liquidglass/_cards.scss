@@ -125,13 +125,21 @@ html .card.show-animation:focus > .cardBox {
 // ---------------------------------------------------------------------------
 // 3. tvOS lift: hover (fine pointers), keyboard focus, TV remote focus; press feedback
 // ---------------------------------------------------------------------------
+// Tilt + sheen position come from cardTilt.ts (mouse only, motion allowed); they default to a flat lift.
 @mixin card-lifted {
-    transform: scale(var(--lg-lift-scale));
+    transform:
+        perspective(1000px)
+        rotateX(var(--lg-tilt-x, 0deg))
+        rotateY(var(--lg-tilt-y, 0deg))
+        scale(var(--lg-lift-scale));
     box-shadow: var(--lg-shadow-lift);
     will-change: transform;
 
     &::after {
         opacity: 1;
+        background:
+            radial-gradient(circle at var(--lg-sheen-x, 20%) var(--lg-sheen-y, 0%), rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0) 55%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 40%);
     }
 }
 

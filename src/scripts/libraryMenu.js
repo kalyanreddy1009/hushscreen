@@ -31,6 +31,7 @@ import { getParameterByName } from '../utils/url.ts';
 import datetime from '../scripts/datetime';
 import { initBottomTabBar } from '../components/liquidglass/bottomTabBar';
 import { initHeaderScroll } from '../components/liquidglass/headerScroll';
+import { initCardTilt } from '../components/liquidglass/cardTilt';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -859,6 +860,7 @@ loadNavDrawer();
 // Liquid Glass theme only: both are no-ops (and detach) while another theme is active
 initHeaderScroll();
 initBottomTabBar({ openLibraries: openMainDrawer });
+initCardTilt();
 
 const LibraryMenu = {
     getTopParentId,

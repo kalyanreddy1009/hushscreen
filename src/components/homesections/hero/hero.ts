@@ -225,6 +225,7 @@ class Hero implements HeroController {
         this.root.className = 'lg-hero lg-hero--pending';
         this.root.setAttribute('aria-roledescription', 'carousel');
         this.root.setAttribute('aria-label', globalize.translate('Home'));
+        this.root.style.setProperty('--lg-hero-interval', `${AUTO_ADVANCE_MS}ms`);
         this.root.innerHTML = `<div class="lg-hero__slides">${items.map((item, i) => renderSlide(apiClient, item, i)).join('')}</div>${renderControls(items.length)}`;
         this.slides = Array.from(this.root.querySelectorAll<HTMLElement>('.lg-hero__slide'));
     }
@@ -311,6 +312,8 @@ class Hero implements HeroController {
         // A newer show() supersedes this one; stale awaits are ignored via the token.
         const token = ++this.showToken;
         this.stopTimer();
+        // Freeze the progress dot while the next backdrop loads; updateTimer clears this once the slide is shown.
+        this.root.classList.add('lg-hero--paused');
         await this.waitForBackdrop(target, this.hasShown ? IMAGE_TIMEOUT_MS : FIRST_IMAGE_TIMEOUT_MS);
         if (token !== this.showToken || this.destroyed) return;
 
@@ -345,14 +348,25 @@ class Hero implements HeroController {
 
     private readonly updateTimer = (): void => {
         this.stopTimer();
+        const eligible = this.items.length > 1 && !prefersReducedMotion() && !this.destroyed;
         // document.hidden is universally available on supported browsers; the compat rule is over-strict here.
         // eslint-disable-next-line compat/compat
-        const canRun = this.items.length > 1 && !prefersReducedMotion() && !document.hidden
-            && !this.hovered && !this.focused && !this.destroyed && !this.paused;
+        const canRun = eligible && !document.hidden && !this.hovered && !this.focused && !this.paused;
         if (canRun) {
+            this.root.classList.remove('lg-hero--paused');
+            // Removing and re-adding the class after a reflow restarts the CSS progress animation in step with the timer.
+            this.root.classList.remove('lg-hero--running');
+            // Reading layout forces the reflow that restarts the CSS animation.
+            this.root.getBoundingClientRect();
+            this.root.classList.add('lg-hero--running');
             this.timer = setInterval(() => {
                 void this.show(this.current + 1);
             }, AUTO_ADVANCE_MS);
+        } else if (eligible) {
+            // Stopped by hover, focus, hidden page or pause: keep the progress dot where it is.
+            this.root.classList.add('lg-hero--paused');
+        } else {
+            this.root.classList.remove('lg-hero--running', 'lg-hero--paused');
         }
     };
 

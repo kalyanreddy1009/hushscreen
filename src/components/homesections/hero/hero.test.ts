@@ -135,6 +135,33 @@ describe('hero', () => {
         }
     });
 
+    it('exposes the auto-advance interval as --lg-hero-interval', async () => {
+        await mountHero(container, makeClient([makeItem('a'), makeItem('b')]));
+        const hero = container.querySelector<HTMLElement>('.lg-hero');
+        expect(hero?.style.getPropertyValue('--lg-hero-interval')).toBe('8000ms');
+    });
+
+    it('marks the hero as running while auto-advance runs and stops on hover', async () => {
+        vi.useFakeTimers();
+        const mounted = mountHero(container, makeClient([makeItem('a'), makeItem('b')]));
+        await vi.advanceTimersByTimeAsync(0);
+        await mounted;
+        // Let the first backdrop wait resolve (timeout), which starts auto-advance.
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const hero = container.querySelector<HTMLElement>('.lg-hero');
+        expect(hero?.classList.contains('lg-hero--running')).toBe(true);
+
+        // Hover keeps the progress animation in place (paused) so the active dot does not snap to full.
+        hero?.dispatchEvent(new Event('mouseenter'));
+        expect(hero?.classList.contains('lg-hero--running')).toBe(true);
+        expect(hero?.classList.contains('lg-hero--paused')).toBe(true);
+
+        hero?.dispatchEvent(new Event('mouseleave'));
+        expect(hero?.classList.contains('lg-hero--paused')).toBe(false);
+        expect(hero?.classList.contains('lg-hero--running')).toBe(true);
+    });
+
     it('plays resume items from the saved position', async () => {
         const item = makeItem('r', { RunTimeTicks: 1000, UserData: { PlaybackPositionTicks: 400 } });
         await mountHero(container, makeClient([], [item]));
