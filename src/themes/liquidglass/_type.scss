@@ -1,0 +1,73 @@
+// Typography: system faces (SF on Apple, Segoe UI Variable on Windows, Noto elsewhere incl. CJK).
+// Hierarchy from size + weight + leading together; tracking tightens as size grows.
+
+html {
+    font-family: var(--lg-font);
+    font-feature-settings: 'kern' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizelegibility;
+}
+
+body {
+    letter-spacing: var(--lg-track-body);
+}
+
+h1,
+.pageTitle {
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    letter-spacing: var(--lg-track-title);
+    line-height: 1.1;
+}
+
+h2,
+.sectionTitle {
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    letter-spacing: var(--lg-track-title);
+    line-height: 1.15;
+}
+
+.sectionTitle {
+    font-size: var(--lg-type-title2);
+}
+
+h3 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.secondaryText,
+.fieldDescription,
+.cardText-secondary {
+    letter-spacing: var(--lg-track-small);
+}
+
+// Utility classes for new components
+.lg-type-display {
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-display);
+    font-weight: 800;
+    letter-spacing: var(--lg-track-display);
+    line-height: 1.02;
+}
+
+.lg-type-title1 {
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-title1);
+    font-weight: 700;
+    letter-spacing: var(--lg-track-title);
+    line-height: 1.08;
+}
+
+.lg-type-headline {
+    font-size: var(--lg-type-headline);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.lg-type-footnote {
+    font-size: var(--lg-type-footnote);
+    letter-spacing: var(--lg-track-small);
+}

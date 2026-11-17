@@ -1,0 +1,174 @@
+// Liquid Glass design tokens. Single source of truth for colour, material, geometry, type and motion.
+// Loaded only while the `liquidglass` theme is active (themes/<id>/theme.css is swapped at runtime).
+//
+// Palette follows tv.apple.com (measured): neutral #1f1f1f page, white text at stepped opacities, white
+// primary pill with black label, colour only from artwork; blue reserved for text links.
+// Contrast (computed against --lg-bg #1f1f1f, L≈0.0137):
+//   --lg-text            white 92% (≈#ededed) → 14.1:1
+//   --lg-text-secondary  white 64% (≈#aeaeae) →  7.5:1
+//   --lg-text-tertiary   white 50% (≈#8f8f8f) →  5.1:1  (page bg only: ~4.7:1 on #2c2c2e, fails on #3a3a3c)
+//   --lg-link            #409cff             →  5.8:1
+//   --lg-on-accent on --lg-accent (black 88% on white 92%) → 14.5:1
+
+:root {
+    // Colour: surfaces (content layer, opaque)
+    --lg-bg: #1f1f1f;
+    --lg-bg-rgb: 31, 31, 31;
+    --lg-bg-elevated: #2c2c2e;
+    --lg-surface-2: #2c2c2e;
+    --lg-surface-3: #3a3a3c;
+    --lg-fill-input: #2c2c2e;
+    --lg-separator: rgba(255, 255, 255, 0.1);
+
+    // Colour: content
+    --lg-text: rgba(255, 255, 255, 0.92);
+    --lg-text-secondary: rgba(255, 255, 255, 0.64);
+    --lg-text-tertiary: rgba(255, 255, 255, 0.5);
+    --lg-on-accent: rgba(0, 0, 0, 0.88);
+
+    // Colour: accent (primary action, selection, progress only). Apple TV: white, not a hue.
+    --lg-accent: rgba(255, 255, 255, 0.92);
+    --lg-accent-hover: #fff;
+    --lg-accent-pressed: rgba(255, 255, 255, 0.78);
+    --lg-accent-text: rgba(255, 255, 255, 0.92);
+    --lg-accent-soft: rgba(255, 255, 255, 0.16);
+    --lg-link: #409cff;
+    --lg-signal-danger: #ff5f57;
+    --lg-signal-success: #34c759;
+    --lg-toggle-on: #30d158; // Apple systemGreen (dark)
+
+    // Ambient tint picked up from artwork (hero/details may set it inline; neutral default), as "r, g, b"
+    --lg-ambient: 40, 40, 40;
+
+    // Material: Liquid Glass (functional layer only)
+    --lg-glass-clear-fill: rgba(30, 30, 30, 0.28);
+    --lg-glass-clear-blur: 14px;
+    --lg-glass-regular-fill: rgba(36, 36, 36, 0.62);
+    --lg-glass-regular-blur: 28px;
+    --lg-glass-frosted-fill: rgba(40, 40, 40, 0.86);
+    --lg-glass-frosted-blur: 40px;
+    --lg-glass-saturate: 1.45;
+    --lg-glass-solid: #2c2c2e;
+    --lg-glass-edge: rgba(255, 255, 255, 0.12);
+    --lg-glass-specular: rgba(255, 255, 255, 0.22);
+    --lg-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0) 42%);
+    --lg-dim: rgba(0, 0, 0, 0.35);
+    --lg-scrim: rgba(0, 0, 0, 0.55);
+
+    // Geometry
+    --lg-radius-xs: 6px;
+    --lg-radius-sm: 10px;
+    --lg-radius-md: 14px;
+    --lg-radius-lg: 20px;
+    --lg-radius-xl: 28px;
+    --lg-radius-pill: 999px;
+    --lg-space-1: 0.25rem;
+    --lg-space-2: 0.5rem;
+    --lg-space-3: 0.75rem;
+    --lg-space-4: 1rem;
+    --lg-space-5: 1.5rem;
+    --lg-space-6: 2rem;
+    --lg-space-7: 3rem;
+    --lg-space-8: 4rem;
+    --lg-gutter: clamp(1rem, 3.2vw, 3.5rem);
+    --lg-hit-min: 44px;
+
+    // Elevation
+    --lg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
+    --lg-shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
+    --lg-shadow-lift: 0 22px 44px -12px rgba(0, 0, 0, 0.7), 0 8px 18px rgba(0, 0, 0, 0.35);
+    --lg-shadow-panel: 0 30px 80px rgba(0, 0, 0, 0.55);
+
+    // Type
+    --lg-font: -apple-system, blinkmacsystemfont, 'SF Pro Text', 'Segoe UI Variable Text', 'Segoe UI', system-ui, 'Noto Sans', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR', 'Noto Sans SC', 'Noto Sans TC', roboto, sans-serif;
+    --lg-font-display: -apple-system, blinkmacsystemfont, 'SF Pro Display', 'Segoe UI Variable Display', 'Segoe UI', system-ui, 'Noto Sans', sans-serif;
+    --lg-type-display: clamp(2.25rem, 4.4vw, 4.25rem);
+    --lg-type-title1: clamp(1.75rem, 2.6vw, 2.5rem);
+    --lg-type-title2: clamp(1.25rem, 1.7vw, 1.6rem);
+    --lg-type-headline: 1.0625rem;
+    --lg-type-body: 1rem;
+    --lg-type-callout: 0.9375rem;
+    --lg-type-footnote: 0.8125rem;
+    --lg-track-display: -0.028em;
+    --lg-track-title: -0.018em;
+    --lg-track-body: -0.005em;
+    --lg-track-small: 0.012em;
+
+    // Motion
+    --lg-dur-micro: 140ms;
+    --lg-dur-focus: 180ms;
+    --lg-dur-glass: 240ms;
+    --lg-dur-panel: 320ms;
+    --lg-dur-page: 360ms;
+    --lg-dur-artwork: 600ms;
+    --lg-dur-spring: 500ms;
+    --lg-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --lg-ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+    --lg-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --lg-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+    --lg-press-scale: 0.97;
+    --lg-lift-scale: 1.06;
+}
+
+// Critically damped spring (damping 1.0, response 0.35 s) sampled over 500 ms:
+// x(t) = 1 - (1 + wt) * e^(-wt), w = 2pi / 0.35.
+@supports (transition-timing-function: linear(0, 1)) {
+    :root {
+        --lg-ease-spring: linear(0, 0.076 5%, 0.226 10%, 0.39 15%, 0.536 20%, 0.656 25%, 0.75 30%, 0.821 35%, 0.873 40%, 0.938 50%, 0.971 60%, 0.986 70%, 0.994 80%, 1);
+    }
+}
+
+// TV: ten-foot UI, overscan-safe gutters, bigger focus lift, no live blur on weak GPUs.
+.layout-tv {
+    --lg-gutter: 5vw;
+    --lg-hit-min: 56px; // remote focus targets read at ten feet (matches the player's TV sizes)
+    --lg-lift-scale: 1.1;
+    --lg-glass-clear-blur: 0;
+    --lg-glass-regular-blur: 0;
+    --lg-glass-frosted-blur: 0;
+    --lg-glass-clear-fill: rgba(30, 30, 30, 0.72);
+    --lg-glass-regular-fill: rgba(36, 36, 36, 0.9);
+    --lg-glass-frosted-fill: #2c2c2e;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --lg-glass-clear-blur: 0;
+        --lg-glass-regular-blur: 0;
+        --lg-glass-frosted-blur: 0;
+        --lg-glass-clear-fill: var(--lg-glass-solid);
+        --lg-glass-regular-fill: var(--lg-glass-solid);
+        --lg-glass-frosted-fill: var(--lg-glass-solid);
+        --lg-glass-sheen: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --lg-text-secondary: rgba(255, 255, 255, 0.85);
+        --lg-text-tertiary: rgba(255, 255, 255, 0.72);
+        --lg-separator: rgba(255, 255, 255, 0.35);
+        --lg-glass-edge: rgba(255, 255, 255, 0.6);
+        --lg-glass-clear-fill: #141414;
+        --lg-glass-regular-fill: #141414;
+        --lg-glass-frosted-fill: #141414;
+        --lg-glass-clear-blur: 0;
+        --lg-glass-regular-blur: 0;
+        --lg-glass-frosted-blur: 0;
+        --lg-accent-text: #fff;
+        --lg-text: #fff;
+        --lg-link: #6cb4ff;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --lg-press-scale: 1;
+        --lg-lift-scale: 1;
+        --lg-dur-artwork: 200ms;
+        --lg-dur-panel: 180ms;
+        --lg-dur-page: 180ms;
+        --lg-dur-spring: 180ms;
+        --lg-ease-spring: ease-out;
+    }
+}

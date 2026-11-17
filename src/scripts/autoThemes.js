@@ -1,5 +1,6 @@
 import * as userSettings from './settings/userSettings';
 import skinManager from './themeManager';
+import { FALLBACK_THEME_ID } from 'hooks/useUserTheme';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import { pageClassOn } from 'utils/dashboard';
 import Events from 'utils/events.ts';
@@ -18,7 +19,8 @@ Events.on(ServerConnections, 'localusersignedin', () => {
 
 pageClassOn('viewbeforeshow', 'page', function () {
     if (this.classList.contains('type-interior')) {
-        skinManager.setTheme(userSettings.dashboardTheme());
+        // Unset dashboard theme stays on the stock theme (see hooks/useUserTheme)
+        skinManager.setTheme(userSettings.dashboardTheme() || FALLBACK_THEME_ID);
     } else {
         skinManager.setTheme(userSettings.theme());
     }

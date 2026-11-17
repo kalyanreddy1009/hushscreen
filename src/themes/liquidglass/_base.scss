@@ -1,0 +1,303 @@
+// Base layer: re-point every colour the stock dark theme hardcodes onto Liquid Glass tokens,
+// and set global focus, selection and press behaviour. Screen-specific styling lives in the partials.
+@use 'mixins' as *;
+
+* {
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+html,
+.backgroundContainer,
+.dialog,
+.nowPlayingPlaylist,
+.nowPlayingContextMenu,
+#comicsPlayer,
+#bookPlayer,
+#pdfPlayer,
+#dialogToc {
+    background-color: var(--lg-bg);
+}
+
+html,
+.skinHeader {
+    color: var(--lg-text);
+}
+
+::selection {
+    background: var(--lg-accent-soft);
+    color: var(--lg-text);
+}
+
+// Backdrop wash tinted by the ambient artwork colour instead of flat black
+.backgroundContainer.withBackdrop {
+    background-color: transparent;
+    background-image:
+        linear-gradient(180deg, rgba(var(--lg-bg-rgb), 0.72) 0%, rgba(var(--lg-bg-rgb), 0.9) 55%, var(--lg-bg) 100%),
+        radial-gradient(120% 80% at 20% 0%, rgba(var(--lg-ambient), 0.35) 0%, transparent 60%);
+}
+
+// Secondary text
+.cardText-secondary,
+.fieldDescription,
+.guide-programNameCaret,
+.listItem .secondary,
+.nowPlayingBarSecondaryText,
+.programSecondaryTitle,
+.secondaryText,
+.checkboxListLabel,
+.inputLabel,
+.inputLabelUnfocused,
+.paperListLabel,
+.textareaLabelUnfocused,
+.alphaPickerButton,
+.emby-tab-button {
+    color: var(--lg-text-secondary);
+}
+
+// Opaque grouped surfaces (content layer, not glass)
+.collapseContent,
+.formDialogFooter:not(.formDialogFooter-clear),
+.formDialogHeader:not(.formDialogHeader-clear),
+.paperList,
+.visualCardBox,
+.appfooter,
+.playlistSectionButton,
+.wizardStartForm,
+.ui-corner-all,
+.ui-shadow {
+    background-color: var(--lg-bg-elevated);
+}
+
+.paperList,
+.collapseContent {
+    border-radius: var(--lg-radius-md);
+}
+
+.actionsheetDivider {
+    background: var(--lg-separator);
+}
+
+// Buttons
+.raised,
+.fab {
+    background: var(--lg-surface-3);
+    color: var(--lg-text);
+}
+
+.raised:focus,
+.fab:focus {
+    background: #2c2c37;
+}
+
+.emby-button {
+    @include press;
+}
+
+.emby-button.raised {
+    border-radius: var(--lg-radius-pill);
+}
+
+.button-submit,
+.emby-button.detailFloatingButton {
+    background: var(--lg-accent);
+    color: var(--lg-on-accent);
+}
+
+.button-submit:focus,
+.button-submit:hover {
+    background: var(--lg-accent-hover);
+    color: var(--lg-on-accent);
+}
+
+.button-submit:active {
+    background: var(--lg-accent-pressed);
+}
+
+.button-delete {
+    background: #c9302c;
+}
+
+.button-flat:hover,
+.buttonActive,
+.metadataSidebarIcon,
+.upNextDialog-countdownText,
+.inputLabelFocused,
+.selectLabelFocused,
+.textareaLabelFocused,
+.emby-tab-button:hover,
+.emby-tab-button.show-focus:focus,
+#dialogToc .bookplayerButtonIcon:hover,
+#dialogToc .toc li a:hover,
+#dialogToc .toc li a:active {
+    color: var(--lg-accent-text) !important;
+}
+
+// Text links: the one place a hue appears (Apple TV keeps blue for links)
+.button-link {
+    color: var(--lg-link) !important;
+}
+
+.emby-tab-button-active {
+    color: var(--lg-text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .paper-icon-button-light:hover:not(:disabled) {
+        color: var(--lg-text);
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.paper-icon-button-light {
+    @include press;
+}
+
+.paper-icon-button-light:active:not(:disabled) {
+    color: var(--lg-text);
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+.paper-icon-button-light.show-focus:focus {
+    color: var(--lg-text);
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+// Keyboard / remote focus: one visible ring everywhere (dark theme filled focus with the accent)
+.emby-button.show-focus:focus,
+.alphaPickerButton-tv:focus,
+.emby-select-tv-withcolor:focus,
+.guide-channelHeaderCell:focus,
+.programCell:focus,
+.guide-date-tab-button.show-focus:focus {
+    background-color: var(--lg-text) !important;
+    color: var(--lg-bg) !important;
+}
+
+.layout-tv .emby-button.detailFloatingButton:focus {
+    background-color: var(--lg-text);
+    color: var(--lg-accent-pressed);
+}
+
+:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 2px;
+}
+
+// Inputs
+.emby-input,
+.emby-textarea,
+.emby-select-withcolor {
+    background: var(--lg-fill-input);
+    border: 1px solid var(--lg-separator);
+    border-radius: var(--lg-radius-sm);
+    color: var(--lg-text);
+    transition: border-color var(--lg-dur-micro) var(--lg-ease-out), box-shadow var(--lg-dur-micro) var(--lg-ease-out);
+}
+
+.emby-input:focus,
+.emby-textarea:focus,
+.emby-select-withcolor:focus {
+    border-color: var(--lg-accent) !important;
+    box-shadow: 0 0 0 3px var(--lg-accent-soft);
+}
+
+.emby-select-withcolor > option {
+    background: var(--lg-surface-2);
+}
+
+.emby-checkbox:checked + span + .checkboxOutline {
+    border-color: var(--lg-accent);
+    background-color: var(--lg-accent);
+}
+
+.emby-checkbox:focus:not(:checked) + span + .checkboxOutline {
+    border-color: var(--lg-accent);
+}
+
+// The accent is white, so the tick must be dark or a checked box reads as a plain white square
+.emby-checkbox:checked + span + .checkboxOutline > .checkboxIcon-checked {
+    color: var(--lg-on-accent);
+}
+
+// Toggles: Apple's green "on" track + white thumb; the thumb's position carries the state, not colour alone
+.mdl-switch__track {
+    background: var(--lg-surface-3);
+}
+
+.mdl-switch__thumb {
+    background: #fff;
+}
+
+.mdl-switch__input:checked + .mdl-switch__label + .mdl-switch__trackContainer > .mdl-switch__track {
+    background: var(--lg-toggle-on);
+}
+
+.mdl-switch__input:checked + .mdl-switch__label + .mdl-switch__trackContainer > .mdl-switch__thumb {
+    background: #fff;
+}
+
+// Accent: selection, progress, status only
+.itemProgressBarForeground,
+.countIndicator,
+.fullSyncIndicator,
+.mediaSourceIndicator,
+.playedIndicator,
+.selectionCommandsPanel {
+    background-color: var(--lg-accent);
+    color: var(--lg-on-accent);
+}
+
+.itemSelectionPanel {
+    border-color: var(--lg-accent);
+}
+
+.progressring-spiner {
+    border-color: var(--lg-accent);
+}
+
+.card:focus .cardBox.visualCardBox,
+.card:focus .cardBox:not(.visualCardBox) .cardScalable {
+    border-color: transparent !important;
+}
+
+// Lists
+.listItem {
+    border-radius: var(--lg-radius-sm);
+    transition: background-color var(--lg-dur-micro) var(--lg-ease-out);
+}
+
+.listItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.listItem:focus {
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.mediaInfoText {
+    color: var(--lg-text);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--lg-radius-xs);
+}
+
+.infoBanner {
+    background: var(--lg-bg-elevated);
+    border-radius: var(--lg-radius-md);
+    color: var(--lg-text);
+}
+
+// Placeholder art when an item has no image: muted indigo family instead of bright cyan
+.defaultCardBackground1 { background-color: #1e1b3a; }
+.defaultCardBackground2 { background-color: #2a2550; }
+.defaultCardBackground3 { background-color: #231f42; }
+.defaultCardBackground4 { background-color: #1a1830; }
+.defaultCardBackground5 { background-color: #2f2a5c; }
+
+// Guide
+.programCell-active {
+    background: var(--lg-surface-2) !important;
+}
+
+.detailTableBodyRow-shaded:nth-child(even) {
+    background: var(--lg-bg-elevated);
+}

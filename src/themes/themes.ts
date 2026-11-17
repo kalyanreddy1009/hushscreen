@@ -8,6 +8,7 @@ declare module '@mui/material/styles' {
     interface ColorSchemeOverrides {
         appletv: true;
         blueradiance: true;
+        liquidglass: true;
         purplehaze: true;
         wmc: true;
     }
@@ -81,6 +82,27 @@ const light = merge({}, DEFAULT_COLOR_SCHEME, {
     }
 });
 
+/** The "Liquid Glass" color scheme (values mirror src/themes/liquidglass/_tokens.scss). */
+const liquidglass = buildCustomColorScheme({
+    palette: {
+        background: {
+            default: '#1f1f1f',
+            paper: '#2c2c2e'
+        },
+        // Apple TV: white primary action with a dark label (MUI derives contrastText)
+        primary: {
+            main: '#ffffff'
+        },
+        text: {
+            primary: 'rgba(255, 255, 255, 0.92)',
+            secondary: 'rgba(255, 255, 255, 0.64)'
+        },
+        AppBar: {
+            defaultBg: '#1f1f1f'
+        }
+    }
+});
+
 /** The "Purple Haze" color scheme. */
 const purplehaze = buildCustomColorScheme({
     palette: {
@@ -117,6 +139,7 @@ export const COLOR_SCHEMES = {
     blueradiance,
     dark: DEFAULT_COLOR_SCHEME,
     light,
+    liquidglass,
     purplehaze,
     wmc
 };

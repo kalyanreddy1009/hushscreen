@@ -9,6 +9,8 @@ export function useUserTheme() {
 
     return {
         theme: theme || defaultTheme?.id || FALLBACK_THEME_ID,
-        dashboardTheme: dashboardTheme || defaultTheme?.id || FALLBACK_THEME_ID
+        // The dashboard keeps the stock theme unless the user picks one: the default user theme
+        // (Liquid Glass) is designed for library browsing, not admin screens.
+        dashboardTheme: dashboardTheme || FALLBACK_THEME_ID
     };
 }

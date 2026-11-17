@@ -1,0 +1,503 @@
+// player — Video OSD: clear-glass controls, seek bar, show/hide.
+// Owned by task T7. Glass only on the functional layer; use the mixins, never hand-written blur.
+@use 'mixins' as *;
+
+// Layering (video OSD):
+//   video  <  .videoOsdBottom (soft gradient, NOT glass, full width)  <  .osdControls (clear-glass panel, small)
+// Blur lives only on the small panel; the full-screen container never gets backdrop-filter.
+// Show/hide is driven by the stock classes (videoOsdBottom-hidden / osdHeader-hidden); JS and the 3 s timer are
+// untouched. The stock JS waits for `transitionend` on the container itself, so the container keeps its own
+// opacity transition.
+
+$lg-osd-shift: 8px;
+$lg-seek-track: 4px;
+$lg-seek-thumb: 14px;
+$lg-seek-pad: 7px; // half the thumb
+$lg-btn-primary: 48px;
+$lg-btn-tv: 56px;
+
+// ---------------------------------------------------------------------------
+// Show / hide: opacity + translateY(8px). Hide mirrors show using the ease-in curve.
+// ---------------------------------------------------------------------------
+.videoOsdBottom,
+.skinHeader-withBackground.osdHeader {
+    transition:
+        opacity var(--lg-dur-glass) var(--lg-ease-out),
+        transform var(--lg-dur-glass) var(--lg-ease-out);
+    will-change: opacity, transform;
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: opacity var(--lg-dur-glass) linear;
+    }
+}
+
+.videoOsdBottom-hidden {
+    opacity: 0;
+    transform: translateY($lg-osd-shift);
+    transition-timing-function: var(--lg-ease-in);
+}
+
+.osdHeader-hidden {
+    opacity: 0;
+    transform: translateY(-$lg-osd-shift);
+    transition-timing-function: var(--lg-ease-in);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .videoOsdBottom-hidden,
+    .osdHeader-hidden {
+        transform: none;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Legibility gradients on the video (plain gradients, no blur)
+// ---------------------------------------------------------------------------
+.videoOsdBottom {
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.28) 55%, rgba(0, 0, 0, 0) 100%);
+    padding-left: max(env(safe-area-inset-left), var(--lg-gutter));
+    padding-right: max(env(safe-area-inset-right), var(--lg-gutter));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--lg-gutter));
+    font-family: var(--lg-font);
+}
+
+.skinHeader-withBackground.osdHeader {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 100%);
+    color: var(--lg-text);
+}
+
+// ---------------------------------------------------------------------------
+// Top header: clear-glass circular back button, vibrant title
+// ---------------------------------------------------------------------------
+.osdHeader .headerTop {
+    padding: var(--lg-space-3) var(--lg-gutter);
+}
+
+.osdHeader .headerBackButton,
+.osdHeader .headerCastButton,
+.osdHeader .headerSyncButton {
+    @include glass(clear);
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-end: var(--lg-space-2);
+
+    .layout-tv & {
+        min-width: $lg-btn-tv;
+        min-height: $lg-btn-tv;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.16);
+        }
+    }
+}
+
+.osdHeader .pageTitle,
+.osdHeader .headerTop h1,
+.osdHeader .headerTop h3 {
+    @include vibrant-text;
+
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-title2);
+    letter-spacing: var(--lg-track-title);
+}
+
+// ---------------------------------------------------------------------------
+// Bottom control panel: floating clear glass over the dim layer
+// ---------------------------------------------------------------------------
+.videoOsdBottom .osdControls {
+    @include glass(clear);
+
+    // --lg-dim sits above the blur so controls stay legible over bright video
+    background-image: linear-gradient(var(--lg-dim), var(--lg-dim)), var(--lg-glass-sheen);
+    border-radius: var(--lg-radius-xl);
+    max-width: 72rem;
+    padding: var(--lg-space-3) var(--lg-space-5) var(--lg-space-2);
+    color: var(--lg-text);
+    box-sizing: border-box;
+
+    @media (max-width: 40em) {
+        border-radius: var(--lg-radius-lg);
+        padding: var(--lg-space-2) var(--lg-space-3);
+    }
+}
+
+.videoOsdBottom .osdTitle {
+    @include vibrant-text;
+
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-headline);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-title);
+}
+
+.videoOsdBottom .osdSecondaryMediaInfo,
+.videoOsdBottom .osdMediaInfo {
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+}
+
+// Time labels (position, duration, ends-at): secondary level on the dim layer (7.9:1 on the base, see tokens)
+.videoOsdBottom .osdPositionText,
+.videoOsdBottom .osdDurationText,
+.videoOsdBottom .osdTimeText {
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--lg-track-small);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+// ---------------------------------------------------------------------------
+// Buttons: circular, >= 44px (48px play/pause), hover fill, press + focus ring
+// ---------------------------------------------------------------------------
+.videoOsdBottom .buttons {
+    gap: var(--lg-space-1);
+}
+
+.videoOsdBottom .buttons button {
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    border-radius: var(--lg-radius-pill);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        transform var(--lg-dur-micro) var(--lg-ease-out),
+        background-color var(--lg-dur-micro) var(--lg-ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+    }
+
+    .layout-tv & {
+        min-width: $lg-btn-tv;
+        min-height: $lg-btn-tv;
+    }
+
+    &:active:not(:disabled) {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+}
+
+// Play / pause is the visually primary control: larger, same white glyph, no accent fill
+.videoOsdBottom .buttons .btnPause {
+    min-width: $lg-btn-primary;
+    min-height: $lg-btn-primary;
+
+    .material-icons {
+        font-size: 2.25rem;
+    }
+
+    .layout-tv & {
+        min-width: 64px;
+        min-height: 64px;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Seek / volume slider (emby-slider). White progress: against the dim layer white is
+// ~15:1, whereas the accent (#6a5ae0) is only ~3:1 against dimmed video, too weak for the
+// primary scrubbing affordance. Accent stays reserved for the now-playing progress line.
+// Track grows via scaleY (not height); thumb appears via scale (not width/height).
+// ---------------------------------------------------------------------------
+.videoOsdBottom .mdl-slider-container {
+    height: 28px;
+}
+
+.videoOsdBottom .mdl-slider-background-flex-container {
+    padding: 0 $lg-seek-pad;
+}
+
+.videoOsdBottom .mdl-slider-background-flex {
+    height: $lg-seek-track;
+    margin-top: -2px;
+    border-radius: var(--lg-radius-pill);
+    background: rgba(255, 255, 255, 0.28);
+    transform: scaleY(1);
+    transition: transform var(--lg-dur-focus) var(--lg-ease-out);
+}
+
+.videoOsdBottom .mdl-slider-background-upper {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.videoOsdBottom .mdl-slider-background-lower {
+    background-color: #fff;
+}
+
+.videoOsdBottom .mdl-slider-background-lower-clear {
+    background-color: transparent;
+}
+
+// Thumb: 14px white circle. Hidden until hover / focus / drag on pointer devices;
+// always visible on touch and TV (nothing to hover).
+@mixin lg-thumb {
+    width: $lg-seek-thumb;
+    height: $lg-seek-thumb;
+    background: #fff;
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    transition: transform var(--lg-dur-focus) var(--lg-ease-out);
+}
+
+.videoOsdBottom .mdl-slider::-webkit-slider-thumb {
+    @include lg-thumb;
+}
+
+.videoOsdBottom .mdl-slider::-moz-range-thumb {
+    @include lg-thumb;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .videoOsdBottom .osdPositionSlider::-webkit-slider-thumb {
+        transform: scale(0);
+    }
+
+    .videoOsdBottom .osdPositionSlider::-moz-range-thumb {
+        transform: scale(0);
+    }
+
+    .videoOsdBottom .osdPositionSlider:hover::-webkit-slider-thumb,
+    .videoOsdBottom .osdPositionSlider:focus-visible::-webkit-slider-thumb,
+    .videoOsdBottom .osdPositionSlider:active::-webkit-slider-thumb {
+        transform: scale(1);
+    }
+
+    .videoOsdBottom .osdPositionSlider:hover::-moz-range-thumb,
+    .videoOsdBottom .osdPositionSlider:focus-visible::-moz-range-thumb,
+    .videoOsdBottom .osdPositionSlider:active::-moz-range-thumb {
+        transform: scale(1);
+    }
+}
+
+.videoOsdBottom .mdl-slider:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 2px;
+    border-radius: var(--lg-radius-pill);
+}
+
+.layout-tv .videoOsdBottom .mdl-slider:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 2px;
+    border-radius: var(--lg-radius-pill);
+}
+
+// Chapter markers: subtle ticks, never louder than the track
+.videoOsdBottom .sliderMarkerContainer {
+    margin: 0 $lg-seek-pad;
+}
+
+.sliderMarker {
+    width: 2px;
+    border-radius: 1px;
+}
+
+.sliderMarker.unwatched {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+.sliderMarker.watched {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+// Seek bubble: regular glass
+.sliderBubble {
+    @include glass(regular);
+
+    border-radius: var(--lg-radius-md);
+    color: var(--lg-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.sliderBubbleText {
+    font-size: var(--lg-type-footnote);
+}
+
+.chapterThumbContainer {
+    border-radius: var(--lg-radius-md);
+    overflow: hidden;
+    box-shadow: var(--lg-shadow-glass);
+}
+
+// ---------------------------------------------------------------------------
+// Now-playing bar: floating regular-glass capsule above the bottom edge
+// (T2 may set --lg-tabbar-offset on mobile so the capsule clears the tab bar)
+// ---------------------------------------------------------------------------
+.nowPlayingBar {
+    @include glass(regular);
+
+    position: fixed;
+    left: max(env(safe-area-inset-left), var(--lg-gutter));
+    right: max(env(safe-area-inset-right), var(--lg-gutter));
+    bottom: calc(env(safe-area-inset-bottom) + var(--lg-tabbar-offset, 0px) + 12px);
+    border-radius: var(--lg-radius-lg);
+    color: var(--lg-text);
+    overflow: hidden;
+    transition: transform var(--lg-dur-panel) var(--lg-ease-spring);
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+
+    @media (max-width: 40em) {
+        left: var(--lg-space-2);
+        right: var(--lg-space-2);
+    }
+}
+
+// Hidden: slide fully below the screen edge (transform only)
+.nowPlayingBar-hidden {
+    transform: translate3d(0, calc(100% + 48px), 0);
+}
+
+.nowPlayingBar .nowPlayingImage {
+    border-radius: var(--lg-radius-sm);
+    background-size: cover;
+    height: 3rem;
+    width: 3rem;
+    margin-inline-start: var(--lg-space-3);
+}
+
+.nowPlayingBarText {
+    color: var(--lg-text);
+    font-size: var(--lg-type-callout);
+    letter-spacing: var(--lg-track-body);
+}
+
+.nowPlayingBarCurrentTime {
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    font-variant-numeric: tabular-nums;
+}
+
+.nowPlayingBar .mediaButton {
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+    transition:
+        transform var(--lg-dur-micro) var(--lg-ease-out),
+        background-color var(--lg-dur-micro) var(--lg-ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+    }
+
+    .layout-tv & {
+        min-width: $lg-btn-tv;
+        min-height: $lg-btn-tv;
+    }
+}
+
+// Thin progress line along the capsule's top edge, in accent
+.nowPlayingBarPositionContainer {
+    top: 0;
+}
+
+.nowPlayingBar .mdl-slider-container {
+    height: 14px;
+}
+
+.nowPlayingBar .mdl-slider-background-flex-container {
+    padding: 0;
+}
+
+.nowPlayingBar .mdl-slider-background-flex {
+    height: 2px;
+    margin-top: -1px;
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.nowPlayingBar .mdl-slider-background-upper {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.nowPlayingBar .mdl-slider-background-lower {
+    background-color: var(--lg-accent);
+}
+
+.nowPlayingBar .mdl-slider-background-lower-clear {
+    background-color: transparent;
+}
+
+.nowPlayingBar .mdl-slider::-webkit-slider-thumb {
+    background: #fff;
+}
+
+.nowPlayingBar .mdl-slider::-moz-range-thumb {
+    background: #fff;
+}
+
+// ---------------------------------------------------------------------------
+// Up-next dialog and player stats: regular glass, readable
+// ---------------------------------------------------------------------------
+.upNextContainer {
+    @include glass(regular);
+
+    border-radius: var(--lg-radius-lg);
+    color: var(--lg-text);
+    max-width: calc(100vw - 2 * var(--lg-gutter));
+    box-sizing: border-box;
+    transition:
+        opacity var(--lg-dur-glass) var(--lg-ease-out),
+        transform var(--lg-dur-glass) var(--lg-ease-out);
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: opacity var(--lg-dur-glass) linear;
+    }
+}
+
+.upNextDialog-countdownText {
+    color: var(--lg-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.upNextDialog-button {
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    border-radius: var(--lg-radius-pill);
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--lg-text);
+}
+
+.playerStats {
+    @include glass(regular);
+
+    border-radius: var(--lg-radius-md);
+    color: var(--lg-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.playerStats-closeButton {
+    color: var(--lg-text-secondary);
+}
+
+.playerStats-stat-label {
+    color: var(--lg-text-secondary);
+}
+
+// Seek track grows 4px -> 6px on hover/focus (kept last so it outranks the compact now-playing rules above)
+.videoOsdBottom .sliderContainer:hover .mdl-slider-background-flex,
+.videoOsdBottom .sliderContainer:focus-within .mdl-slider-background-flex {
+    transform: scaleY(1.5);
+}

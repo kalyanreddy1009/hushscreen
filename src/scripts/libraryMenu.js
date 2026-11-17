@@ -29,6 +29,8 @@ import { PluginType } from '../types/plugin.ts';
 import Events from '../utils/events.ts';
 import { getParameterByName } from '../utils/url.ts';
 import datetime from '../scripts/datetime';
+import { initBottomTabBar } from '../components/liquidglass/bottomTabBar';
+import { initHeaderScroll } from '../components/liquidglass/headerScroll';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -853,6 +855,10 @@ Events.on(playbackManager, 'playerchange', updateCastIcon);
 
 fetchServerName(getCurrentApiClient());
 loadNavDrawer();
+
+// Liquid Glass theme only: both are no-ops (and detach) while another theme is active
+initHeaderScroll();
+initBottomTabBar({ openLibraries: openMainDrawer });
 
 const LibraryMenu = {
     getTopParentId,

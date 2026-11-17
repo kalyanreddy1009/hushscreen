@@ -85,7 +85,7 @@ async function loadDisplaySettings({
 
     const displaySettings = {
         customCss: settings.customCss() || '',
-        dashboardTheme: settings.dashboardTheme() || defaultTheme?.id || FALLBACK_THEME_ID,
+        dashboardTheme: settings.dashboardTheme() || FALLBACK_THEME_ID,
         dateTimeLocale: settings.dateTimeLocale() || 'auto',
         disableCustomCss: Boolean(settings.disableCustomCss()),
         displayMissingEpisodes: user?.Configuration?.DisplayMissingEpisodes ?? false,

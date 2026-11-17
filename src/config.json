@@ -13,12 +13,16 @@
     }, {
       "name": "Dark",
       "id": "dark",
-      "color": "#202020",
-      "default": true
+      "color": "#202020"
     }, {
       "name": "Light",
       "id": "light",
       "color": "#303030"
+    }, {
+      "name": "Liquid Glass",
+      "id": "liquidglass",
+      "color": "#1f1f1f",
+      "default": true
     }, {
       "name": "Purple Haze",
       "id": "purplehaze",

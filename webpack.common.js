@@ -34,7 +34,7 @@ try {
 
 const NODE_MODULES_REGEX = /[\\/]node_modules[\\/]/;
 
-const THEMES = fg.globSync('themes/**/*.scss', { cwd: path.resolve(__dirname, 'src') });
+const THEMES = fg.globSync('themes/*/theme.scss', { cwd: path.resolve(__dirname, 'src') });
 const THEMES_BY_ID = THEMES.reduce((acc, theme) => {
     acc[theme.substring(0, theme.lastIndexOf('/'))] = `./${theme}`;
     return acc;

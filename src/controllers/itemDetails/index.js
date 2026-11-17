@@ -22,6 +22,7 @@ import { playbackManager } from 'components/playback/playbackmanager';
 import { appRouter } from 'components/router/appRouter';
 import itemShortcuts from 'components/shortcuts';
 import { AppFeature } from 'constants/appFeature';
+import { renderInfoBadgesHtml } from 'components/liquidglass/qualityBadges';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import browser from 'scripts/browser';
@@ -34,6 +35,7 @@ import { getPortraitShape, getSquareShape } from 'utils/card';
 import Dashboard from 'utils/dashboard';
 import Events from 'utils/events';
 import { getItemBackdropImageUrl } from 'utils/jellyfin-apiclient/backdropImage';
+import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
 
 import 'elements/emby-itemscontainer/emby-itemscontainer';
 import 'elements/emby-checkbox/emby-checkbox';
@@ -1048,6 +1050,12 @@ function renderMiscInfo(page, item) {
             episodeTitle: false,
             subtitles: false
         });
+
+        // fillPrimaryMediaInfo replaced the content above, so the badges cannot duplicate across re-renders.
+        const badgesHtml = isLiquidGlass() && miscInfo.innerHTML ? renderInfoBadgesHtml(item) : '';
+        if (badgesHtml) {
+            miscInfo.insertAdjacentHTML('beforeend', `<span class="lg-info-badges">${badgesHtml}</span>`);
+        }
 
         if (miscInfo.innerHTML && item.Type !== 'SeriesTimer') {
             miscInfo.classList.remove('hide');

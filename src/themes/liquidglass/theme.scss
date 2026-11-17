@@ -1,0 +1,15 @@
+// Liquid Glass theme entry (built by webpack as themes/liquidglass/theme.css, swapped in by ThemeCss.tsx).
+// Layering: stock dark rules -> tokens -> type -> base remap -> one partial per screen area.
+// Because this file only loads while the theme is active, nothing here needs [data-theme] scoping.
+@use '../dark/theme' as dark;
+@use 'tokens';
+@use 'type';
+@use 'base';
+@use 'nav';
+@use 'cards';
+@use 'badges';
+@use 'hero';
+@use 'details';
+@use 'search';
+@use 'dialogs';
+@use 'player';

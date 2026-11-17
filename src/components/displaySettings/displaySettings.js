@@ -18,6 +18,7 @@ import '../../elements/emby-checkbox/emby-checkbox';
 import '../../elements/emby-button/emby-button';
 import '../../elements/emby-textarea/emby-textarea';
 import toast from '../toast/toast';
+import { FALLBACK_THEME_ID } from '../../hooks/useUserTheme';
 import template from './displaySettings.template.html';
 
 function fillThemes(select, selectedTheme) {
@@ -107,7 +108,7 @@ function loadForm(context, user, userSettings) {
     }
 
     fillThemes(context.querySelector('#selectTheme'), userSettings.theme());
-    fillThemes(context.querySelector('#selectDashboardTheme'), userSettings.dashboardTheme());
+    fillThemes(context.querySelector('#selectDashboardTheme'), userSettings.dashboardTheme() || FALLBACK_THEME_ID);
 
     loadScreensavers(context, userSettings);
 

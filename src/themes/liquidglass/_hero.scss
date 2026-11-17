@@ -1,0 +1,374 @@
+// hero — Cinematic home hero (markup from src/components/homesections/hero/).
+// Owned by task T4. Glass only on the functional layer (secondary controls); the hero surface is content.
+@use 'mixins' as *;
+
+.lg-hero {
+    // tv.apple.com: the hero fills ~89% of the viewport and runs under the top bar
+    --lg-hero-height: min(70vh, 640px);
+
+    position: relative;
+    width: 100%;
+    height: var(--lg-hero-height);
+    min-height: 22rem;
+    margin-bottom: var(--lg-space-5);
+    overflow: hidden;
+    background: var(--lg-bg);
+    color: var(--lg-text);
+
+    @media (min-width: 640px) {
+        --lg-hero-height: min(76vh, 820px);
+    }
+
+    @media (min-width: 1024px) {
+        --lg-hero-height: min(86vh, 1000px);
+    }
+}
+
+.lg-hero__slides {
+    position: absolute;
+    inset: 0;
+}
+
+.lg-hero__slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    // Visibility flips after the fade-out so the crossfade plays, yet inactive slides are unreachable
+    transition:
+        opacity var(--lg-dur-artwork) var(--lg-ease-in-out),
+        visibility 0s linear var(--lg-dur-artwork);
+
+    &.is-active {
+        opacity: 1;
+        pointer-events: auto;
+        visibility: visible;
+        transition-delay: 0s;
+    }
+
+    // Bottom + left readability gradients into the page background
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 28%, transparent 62%),
+            linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.78) 0%, rgba(var(--lg-bg-rgb), 0.4) 38%, transparent 70%),
+            linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.55) 0%, transparent 22%);
+        pointer-events: none;
+    }
+}
+
+.lg-hero__backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 20%;
+}
+
+.lg-hero__content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--lg-space-3);
+    box-sizing: border-box;
+    width: min(100%, 44rem);
+    // Top padding keeps content clear of the glass header that overlaps the hero
+    padding: 5rem var(--lg-gutter) var(--lg-space-6);
+}
+
+.lg-hero__heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lg-space-2);
+    margin: 0;
+}
+
+.lg-hero__logo {
+    max-width: min(40vw, 22rem);
+    max-height: 120px;
+    object-fit: contain;
+    object-position: left bottom;
+
+    @media (max-width: 639px) {
+        max-width: 70vw;
+        max-height: 88px;
+    }
+}
+
+.lg-hero__title {
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-display);
+    font-weight: 700;
+    letter-spacing: var(--lg-track-display);
+    line-height: 1.05;
+    text-wrap: balance;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+}
+
+.lg-hero__subtitle {
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-headline);
+    font-weight: 500;
+}
+
+// Line one: "Movie · Sci-Fi · Adventure"
+.lg-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lg-space-1) var(--lg-space-2);
+    color: var(--lg-text);
+    font-size: var(--lg-type-callout);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-small);
+
+    > span + span::before {
+        content: '\00b7';
+        margin-inline-end: var(--lg-space-2);
+    }
+
+    &:empty {
+        display: none;
+    }
+}
+
+// Line two: year · runtime · star · RT % · [rating + quality badges] [IMDb]
+.lg-hero__info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lg-space-1) var(--lg-space-2);
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-small);
+
+    &:empty {
+        display: none;
+    }
+}
+
+.lg-hero__info-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+
+    + .lg-hero__info-item::before {
+        content: '\00b7';
+        margin-inline-end: var(--lg-space-1);
+    }
+}
+
+.lg-hero__badges {
+    flex-wrap: wrap;
+}
+
+// The IMDb chip does not fit narrow screens
+@media (max-width: 639px) {
+    .lg-hero__badges .lg-badge--link {
+        display: none;
+    }
+}
+
+.lg-hero__overview {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-body);
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+
+    @media (min-width: 640px) {
+        font-size: var(--lg-type-footnote);
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+}
+
+.lg-hero__progress {
+    width: min(100%, 16rem);
+    height: 4px;
+    overflow: hidden;
+    border-radius: var(--lg-radius-pill);
+    background: var(--lg-separator);
+
+    > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--lg-accent);
+    }
+}
+
+.lg-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lg-space-3);
+    margin-top: var(--lg-space-2);
+}
+
+// Shared button base (44px floor)
+.lg-hero__btn {
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lg-space-2);
+    box-sizing: border-box;
+    padding: 0 var(--lg-space-5);
+    border: 0;
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+    font: inherit;
+    font-size: var(--lg-type-headline);
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.lg-hero__btn--primary {
+    background: var(--lg-accent);
+    color: var(--lg-on-accent);
+
+    &:hover {
+        background: var(--lg-accent-hover);
+    }
+
+    &:active {
+        background: var(--lg-accent-pressed);
+    }
+
+    .material-icons {
+        font-size: 1.5rem;
+    }
+}
+
+.lg-hero__btn--info,
+.lg-hero__btn--circle {
+    @include glass(clear, false);
+}
+
+.lg-hero__btn--circle {
+    width: var(--lg-hit-min);
+    padding: 0;
+}
+
+.lg-hero__fav[aria-pressed='true'] .material-icons {
+    color: var(--lg-signal-danger);
+}
+
+// Pager + previous/next
+.lg-hero__controls {
+    position: absolute;
+    inset-inline: var(--lg-gutter);
+    bottom: var(--lg-space-5);
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--lg-space-3);
+    pointer-events: none;
+
+    > * {
+        pointer-events: auto;
+    }
+}
+
+.lg-hero__dots {
+    display: flex;
+    align-items: center;
+}
+
+.lg-hero__dot {
+    @include hit-target;
+    @include focus-ring(var(--lg-radius-pill), 0);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+
+    > span {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--lg-radius-pill);
+        background: rgba(255, 255, 255, 0.4);
+        transition: transform var(--lg-dur-glass) var(--lg-ease-out), background-color var(--lg-dur-glass) var(--lg-ease-out);
+    }
+
+    &[aria-current='true'] > span {
+        background: var(--lg-text);
+        transform: scale(1.35);
+    }
+}
+
+// Previous/next: hover-revealed on pointer devices, always focusable and always visible on touch
+.lg-hero__nav {
+    @media (hover: hover) and (pointer: fine) {
+        opacity: 0;
+        transition: opacity var(--lg-dur-glass) var(--lg-ease-out), transform var(--lg-dur-micro) var(--lg-ease-out);
+    }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .lg-hero:hover .lg-hero__nav,
+    .lg-hero:focus-within .lg-hero__nav {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 639px) {
+    .lg-hero__nav {
+        display: none;
+    }
+
+    .lg-hero__controls {
+        justify-content: center;
+    }
+
+    // Centred dots would sit on the action row (their 44px targets swallowed taps on Info/Favorite);
+    // reserve the controls' row below the actions instead
+    .lg-hero__content {
+        padding-bottom: calc(var(--lg-space-5) + var(--lg-hit-min) + var(--lg-space-2));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lg-hero__slide {
+        transition-duration: 1ms;
+    }
+}
+
+// First paint: height is reserved by .lg-hero itself; the backdrop and text stay hidden together until
+// the first backdrop is ready, then fade in as one (the slide's opacity transition carries it).
+.lg-hero--pending {
+    .lg-hero__slide,
+    .lg-hero__slide.is-active {
+        opacity: 0;
+    }
+}
+
+// Full bleed: on the home tab that shows the hero, the page drops its header clearance so the artwork runs
+// under the floating glass header (the header's top scrim and the hero's own top gradient keep it legible).
+// Scoped to the active tab so Favorites keeps its offset; no :has() support = the stock offset stays.
+#indexPage.homePage:has(.pageTabContent.is-active .lg-hero) {
+    padding-top: 0 !important;
+}

@@ -1,0 +1,65 @@
+// badges — Apple TV style metadata badges (markup from src/components/liquidglass/qualityBadges.ts).
+// Badges are metadata, not buttons: text only, outlined, secondary text colour. The IMDb chip is a link.
+@use 'mixins' as *;
+
+// Outlined metadata badge. Also used to restyle the stock official-rating pill on the details page.
+@mixin badge-outline {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 2px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.4); // fallback where color-mix is unsupported
+    border-radius: var(--lg-radius-xs);
+    color: var(--lg-text-secondary);
+    // Never below the 11pt mobile minimum (typography.md), even when the root font is under 16px
+    font-size: max(11px, 0.6875rem);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-small);
+    line-height: 1;
+    white-space: nowrap;
+
+    @supports (color: color-mix(in srgb, red, blue)) {
+        border-color: color-mix(in srgb, currentcolor 40%, transparent);
+    }
+
+    @media (prefers-contrast: more) {
+        border-color: currentcolor;
+        color: var(--lg-text);
+    }
+}
+
+.lg-badge {
+    @include badge-outline;
+}
+
+.lg-badge--link {
+    @include focus-ring(var(--lg-radius-xs), 2px);
+
+    position: relative;
+    text-decoration: none;
+
+    // 24px minimum hit area without growing the visual badge
+    &::after {
+        content: '';
+        position: absolute;
+        inset: -6px -4px;
+    }
+
+    &:hover {
+        border-color: currentcolor;
+        color: var(--lg-text);
+    }
+}
+
+// External links cannot open on TV
+.layout-tv .lg-badge--link {
+    display: none;
+}
+
+// Wrapper used by the details page; wraps gracefully on narrow screens
+.lg-info-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lg-space-1) 0.375rem;
+}

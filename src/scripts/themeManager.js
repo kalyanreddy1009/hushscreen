@@ -44,6 +44,8 @@ function setTheme(id) {
 
             // set the theme attribute for mui
             document.documentElement.setAttribute('data-theme', info.id);
+            // Stable copy that MUI's ThemeProvider never rewrites (see themes/liquidglass/isLiquidGlass)
+            document.documentElement.setAttribute('data-jf-theme', info.id);
 
             // set the meta theme color
             document.getElementById('themeColor').content = info.color;

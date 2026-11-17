@@ -1,0 +1,414 @@
+// details — Item details page: full-bleed backdrop, title block, glass action cluster, cast/seasons.
+// Owned by task T5. Glass only on the functional layer; use the mixins, never hand-written blur.
+@use 'mixins' as *;
+@use 'badges' as *;
+
+$details-backdrop-height: 70vh;
+$details-ribbon-height: 12em;
+$details-title-offset: 32.45vw; // stock left inset that clears the poster on desktop
+
+// ---------------------------------------------------------------------------
+// Motion: artwork settles in, title block and actions rise in on a 40 ms stagger.
+// Reduced motion falls back to opacity only.
+// ---------------------------------------------------------------------------
+@keyframes lg-details-rise {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes lg-details-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes lg-details-backdrop {
+    from {
+        opacity: 0;
+        transform: scale(1.04);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Full-bleed backdrop with readability gradients into --lg-bg
+// ---------------------------------------------------------------------------
+.itemDetailPage {
+    overflow-x: clip; // the 1.04 settle scale must not create a horizontal scrollbar
+}
+
+.itemDetailPage .itemBackdrop {
+    height: $details-backdrop-height;
+    background-attachment: scroll; // fixed attachment fights the transform animation
+    transform-origin: center top;
+    animation: lg-details-backdrop var(--lg-dur-artwork) var(--lg-ease-out) both;
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 22%, transparent 60%),
+            linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
+
+        [dir='rtl'] & {
+            background-image:
+                linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 22%, transparent 60%),
+                linear-gradient(to left, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
+        }
+    }
+}
+
+.layout-mobile .itemDetailPage .itemBackdrop {
+    height: 50vh;
+    background-position: top center;
+}
+
+// ---------------------------------------------------------------------------
+// Ribbon: no opaque bar; the gradients do the job. Stock .layout-tv rule (background: none) still applies.
+// ---------------------------------------------------------------------------
+.detailRibbon {
+    background: none;
+}
+
+// Desktop: the ribbon sits beside the floated poster (25vw). Stack it as a column (info, then actions)
+// and start its content at the same 32.45vw edge as the logo and the sections below.
+.layout-desktop .itemDetailPage .detailRibbon {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    height: auto;
+    min-height: $details-ribbon-height;
+    margin-top: -$details-ribbon-height;
+
+    [dir='ltr'] & {
+        padding-left: calc(#{$details-title-offset} - 25vw);
+    }
+
+    [dir='rtl'] & {
+        padding-right: calc(#{$details-title-offset} - 25vw);
+    }
+
+    .infoWrapper {
+        flex: 0 0 auto;
+        width: 100%;
+    }
+}
+
+// Seamless fade: containers share the backdrop gradient's end colour (also under .noBackdropTransparency)
+.itemDetailPage .detailPagePrimaryContainer,
+.noBackdropTransparency .itemDetailPage .detailPagePrimaryContainer {
+    background-color: var(--lg-bg);
+}
+
+// ---------------------------------------------------------------------------
+// Title block
+// ---------------------------------------------------------------------------
+.itemDetailPage .detailLogo {
+    top: calc(#{$details-backdrop-height} - #{$details-ribbon-height} - 18vh - 0.75rem);
+    width: min(32vw, 28rem);
+    height: 18vh;
+    background-position: left bottom;
+    animation: lg-details-fade var(--lg-dur-page) var(--lg-ease-out) backwards;
+
+    [dir='ltr'] & {
+        left: $details-title-offset;
+        right: auto;
+    }
+
+    [dir='rtl'] & {
+        right: $details-title-offset;
+        left: auto;
+        background-position: right bottom;
+    }
+}
+
+.itemDetailPage .itemName {
+    font-family: var(--lg-font-display);
+    font-size: var(--lg-type-display);
+    font-weight: 800;
+    letter-spacing: var(--lg-track-display);
+    line-height: 1.04;
+    white-space: normal;
+    text-wrap: balance;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+    max-height: 2.2em; // two lines at most
+    overflow: hidden;
+
+    // Parent / original-title context lines stay at title scale
+    &.parentName,
+    &.originalTitle {
+        font-size: var(--lg-type-title2);
+        font-weight: 600;
+        letter-spacing: var(--lg-track-title);
+    }
+}
+
+.layout-mobile .itemDetailPage h1.itemName {
+    font-size: var(--lg-type-title1);
+}
+
+.itemDetailPage .parentName,
+.itemDetailPage .parentName a {
+    color: var(--lg-text-secondary);
+}
+
+// Info line (tv.apple.com reference): 13px/600 secondary, official rating and quality as outlined badges
+.itemDetailPage .itemMiscInfo {
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-small);
+    gap: var(--lg-space-1) 0;
+
+    .mediaInfoItem {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    // Tidy dot separators between plain items (pills and star ratings carry their own shape)
+    .mediaInfoItem:not(:last-child):not(:has(.mediaInfoText))::after {
+        content: '\00b7';
+        margin-inline: 0.55em 0.1em;
+        color: var(--lg-text-tertiary);
+    }
+}
+
+.itemDetailPage .itemGenres,
+.itemDetailPage .tagline {
+    color: var(--lg-text-secondary);
+    letter-spacing: var(--lg-track-small);
+}
+
+.itemDetailPage .tagline {
+    font-size: var(--lg-type-headline);
+    font-weight: 600;
+    font-style: italic;
+}
+
+.itemDetailPage .overview {
+    max-width: 70ch;
+    font-size: var(--lg-type-body);
+    line-height: 1.5;
+    color: var(--lg-text);
+    letter-spacing: var(--lg-track-body);
+}
+
+// Official rating: outlined badge (not a filled pill), with a small gap from the item before it
+.itemDetailPage .itemMiscInfo .mediaInfoOfficialRating {
+    background: none;
+    margin-inline-start: var(--lg-space-1);
+
+    @include badge-outline;
+}
+
+.itemDetailPage .itemMiscInfo .lg-info-badges {
+    margin-inline-start: var(--lg-space-1);
+}
+
+// Media info chips as subtle pills
+.itemDetailPage .mediaInfoText:not(.mediaInfoOfficialRating),
+.itemDetailPage .mediaInfoProgramAttribute {
+    padding: 0.2em 0.65em;
+    border-radius: var(--lg-radius-pill);
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid var(--lg-separator);
+    color: var(--lg-text-secondary);
+}
+
+// Entry stagger (backwards fill: no residual transform once finished)
+.itemDetailPage .nameContainer {
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) backwards;
+}
+
+.itemDetailPage .itemMiscInfo-primary {
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 40ms backwards;
+}
+
+.itemDetailPage .mainDetailButtons {
+    flex-wrap: wrap;
+    gap: var(--lg-space-3);
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 80ms backwards;
+}
+
+.itemDetailPage .detailPagePrimaryContent {
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 120ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .itemDetailPage .itemBackdrop,
+    .itemDetailPage .nameContainer,
+    .itemDetailPage .itemMiscInfo-primary,
+    .itemDetailPage .mainDetailButtons,
+    .itemDetailPage .detailPagePrimaryContent {
+        animation-name: lg-details-fade;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action cluster: solid accent pill for Play/Resume, glass-clear circles for the rest
+// ---------------------------------------------------------------------------
+.itemDetailPage .mainDetailButtons .detailButton {
+    @include glass(clear, false);
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    // --lg-dim sits under the glass so icons stay legible over bright artwork
+    background-image: var(--lg-glass-sheen), linear-gradient(var(--lg-dim), var(--lg-dim));
+    flex-direction: row;
+    min-width: var(--lg-hit-min);
+    min-height: var(--lg-hit-min);
+    padding: 0 !important;
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+
+    &:hover {
+        background-color: var(--lg-glass-regular-fill);
+    }
+
+    .detailButton-icon {
+        font-size: 1.5rem !important;
+    }
+}
+
+.itemDetailPage .mainDetailButtons .btnPlay {
+    gap: var(--lg-space-2);
+    padding-inline: var(--lg-space-5) !important;
+    background-color: var(--lg-accent);
+    background-image: none;
+    border-color: transparent;
+    box-shadow: var(--lg-shadow-1);
+    color: var(--lg-on-accent);
+    font-weight: 600;
+
+    .layout-mobile & {
+        flex: 1 1 100%;
+        max-width: 20rem;
+        justify-content: center;
+
+        &::after {
+            content: attr(title);
+            font-size: var(--lg-type-headline);
+        }
+    }
+
+    &:hover,
+    &:focus-visible {
+        background-color: var(--lg-accent-hover);
+    }
+
+    &:active:not(:disabled) {
+        background-color: var(--lg-accent-pressed);
+    }
+
+    // The label comes from the localized title attribute, so no markup or handler changes
+    @media (min-width: 40em) {
+        &::after {
+            content: attr(title);
+            font-size: var(--lg-type-headline);
+            letter-spacing: var(--lg-track-body);
+        }
+    }
+}
+
+.layout-mobile .itemDetailPage .mainDetailButtons {
+    justify-content: center;
+}
+
+// TV: no transforms on focus beyond the ring
+.layout-tv .itemDetailPage .mainDetailButtons .detailButton:active {
+    transform: none;
+}
+
+// ---------------------------------------------------------------------------
+// Poster / primary image
+// ---------------------------------------------------------------------------
+.itemDetailPage .detailImageContainer .card .cardBox,
+.itemDetailPage .detailImageContainer .card .cardScalable,
+.itemDetailPage .itemDetailImage {
+    border-radius: var(--lg-radius-md);
+}
+
+.itemDetailPage .detailImageContainer .card .cardBox,
+.itemDetailPage .itemDetailImage {
+    box-shadow: var(--lg-shadow-lift);
+}
+
+// ---------------------------------------------------------------------------
+// Sections below: content layer, opaque, generous spacing, aligned to the gutter
+// ---------------------------------------------------------------------------
+.itemDetailPage .detailVerticalSection {
+    margin-bottom: var(--lg-space-6);
+}
+
+.itemDetailPage .detailVerticalSection .sectionTitle {
+    margin-bottom: var(--lg-space-3);
+}
+
+.itemDetailPage .detailPageSecondaryContainer,
+.noBackdropTransparency .itemDetailPage .detailPageSecondaryContainer {
+    background-color: var(--lg-bg);
+    padding-top: var(--lg-space-5);
+}
+
+.layout-mobile .itemDetailPage .detailPageContent,
+.layout-mobile .itemDetailPage .detailPagePrimaryContent {
+    padding-inline: var(--lg-gutter) !important;
+}
+
+.itemDetailPage .itemDetailsGroup .label {
+    color: var(--lg-text-secondary);
+    letter-spacing: var(--lg-track-small);
+}
+
+.itemDetailPage .itemDetailsGroup .content a {
+    color: var(--lg-text);
+}
+
+// Episode / track rows: rounded artwork, readable secondary text (hover bg comes from _base listItem rules)
+.itemDetailPage .listItem {
+    padding-block: var(--lg-space-2);
+}
+
+.itemDetailPage .listItemImage,
+.itemDetailPage .listItem .cardImageContainer {
+    border-radius: var(--lg-radius-sm);
+    overflow: hidden;
+}
+
+.itemDetailPage .listItem .secondary {
+    color: var(--lg-text-secondary);
+    line-height: 1.4;
+}
+
+// When the logo is shown (desktop widths, where stock displays it) it is the title: keep the text title
+// in the accessibility tree but visually hidden. Browsers without :has() keep both.
+@media (min-width: 68.8em) {
+    .layout-desktop .itemDetailPage:has(.detailLogo:not(.hide)) .nameContainer .itemName:not(.parentName):not(.originalTitle) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}

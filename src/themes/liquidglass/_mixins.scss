@@ -1,0 +1,112 @@
+// Liquid Glass mixins. Use these instead of hand-writing glass, focus, press or edge effects.
+// HIG rule (liquid-glass.md): glass belongs ONLY to the functional layer — bars, nav, sheets,
+// popovers, menus, player controls. Never on cards, rows or content sections.
+
+// Glass material. $variant: clear | regular | frosted.
+// Fill + sheen + hairline edge + specular top light + soft shadow; opaque fallback when blur is
+// unsupported, transparency is reduced, contrast is increased, or on TV layouts (tokens zero the blur).
+@mixin glass($variant: regular, $shadow: true) {
+    background-color: var(--lg-glass-#{$variant}-fill);
+    background-image: var(--lg-glass-sheen);
+    border: 1px solid var(--lg-glass-edge);
+    backdrop-filter: blur(var(--lg-glass-#{$variant}-blur)) saturate(var(--lg-glass-saturate));
+    box-shadow: inset 0 1px 0 var(--lg-glass-specular);
+
+    @if $shadow {
+        box-shadow: inset 0 1px 0 var(--lg-glass-specular), var(--lg-shadow-glass);
+    }
+
+    // Autoprefixer expands this condition for -webkit- Safari
+    @supports not (backdrop-filter: blur(1px)) {
+        background-color: var(--lg-glass-solid);
+    }
+
+    // No live blur at all where the tokens say so (saves a compositing pass)
+    .layout-tv &,
+    .noBackdropFilter & {
+        backdrop-filter: none;
+    }
+
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+        backdrop-filter: none;
+    }
+
+    @media (prefers-contrast: more) {
+        border-width: 2px;
+    }
+}
+
+// Materialize: glass arrives as a material (blur + scale + opacity together), exits along the same path.
+// Include on the element; the caller sets the closed state (opacity 0 + scale .96) and the open state (1 / 1).
+@mixin glass-materialize($origin: center top) {
+    transform-origin: $origin;
+    transition:
+        opacity var(--lg-dur-glass) var(--lg-ease-out),
+        transform var(--lg-dur-panel) var(--lg-ease-spring);
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: opacity var(--lg-dur-glass) linear;
+    }
+}
+
+// Visible keyboard / remote focus. Never rely on hover alone.
+@mixin focus-ring($radius: var(--lg-radius-md), $offset: 3px) {
+    &:focus {
+        outline: none;
+    }
+
+    &:focus-visible,
+    .layout-tv &:focus {
+        border-radius: $radius;
+        outline: 2px solid rgba(255, 255, 255, 0.92);
+        outline-offset: $offset;
+        box-shadow: 0 0 0 6px var(--lg-accent-soft);
+    }
+}
+
+// Press feedback on pointer-down (not release), compositor-only.
+@mixin press {
+    transition: transform var(--lg-dur-micro) var(--lg-ease-out);
+
+    &:active:not(:disabled) {
+        transform: scale(var(--lg-press-scale));
+    }
+}
+
+// tvOS-style lift for focusable media (cards). Content layer: shadow + scale + sheen, NO glass.
+@mixin lift($target: '&') {
+    transition:
+        transform var(--lg-dur-spring) var(--lg-ease-spring),
+        box-shadow var(--lg-dur-focus) var(--lg-ease-out);
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            transform: scale(var(--lg-lift-scale));
+            box-shadow: var(--lg-shadow-lift);
+        }
+    }
+
+    &:focus-visible,
+    .layout-tv &:focus {
+        transform: scale(var(--lg-lift-scale));
+        box-shadow: var(--lg-shadow-lift);
+    }
+}
+
+// Scroll edge effect: content fades where it meets a floating bar instead of a hard divider.
+@mixin scroll-edge($direction: bottom, $size: 28px) {
+    mask-image: linear-gradient(to #{$direction}, #000 calc(100% - #{$size}), transparent);
+}
+
+// Text that sits on glass: a touch heavier with a faint shadow so it holds over moving content.
+@mixin vibrant-text {
+    color: var(--lg-text);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+    letter-spacing: var(--lg-track-small);
+}
+
+// Hit target floor without changing the visual size.
+@mixin hit-target($min: var(--lg-hit-min)) {
+    min-width: $min;
+    min-height: $min;
+}

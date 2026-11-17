@@ -1,0 +1,299 @@
+// nav — Floating glass header, drawer sidebar, mobile bottom tab bar.
+// Owned by task T2. Glass only on the functional layer; use the mixins, never hand-written blur.
+@use 'mixins' as *;
+
+$lg-tabbar-height: 4rem;
+$lg-header-inset: 0.5rem;
+
+// Content offset under the one-row capsule: inset + 5rem capsule + one spacing step
+$lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(safe-area-inset-top));
+
+// ---------------------------------------------------------------- Header
+// Inset floating capsule (regular glass). Condenses once the page scrolls (see headerScroll.ts).
+.skinHeader {
+    @include glass(regular);
+
+    top: $lg-header-inset;
+    right: var(--lg-gutter);
+    left: var(--lg-gutter);
+    border-radius: var(--lg-radius-xl);
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+    margin-top: env(safe-area-inset-top);
+    transition: transform var(--lg-dur-glass) var(--lg-ease-out);
+
+    // Scroll-edge effect: a shadow cast upward fades content out in the gap above the capsule
+    // (negative spread keeps it off the sides and bottom)
+    box-shadow:
+        inset 0 1px 0 var(--lg-glass-specular),
+        var(--lg-shadow-glass),
+        0 -28px 22px -6px rgba(var(--lg-bg-rgb), 0.92);
+
+    // Stock header paints an opaque background; glass supplies it
+    &.skinHeader-withBackground {
+        background-color: var(--lg-glass-regular-fill);
+    }
+
+    .headerTop {
+        padding: 0.54em var(--lg-space-3);
+    }
+
+    // Header buttons: 44px targets, press on pointer-down, visible focus
+    .headerButton {
+        @include hit-target;
+        @include press;
+        @include focus-ring(var(--lg-radius-pill));
+
+        color: var(--lg-text);
+    }
+
+    .pageTitle {
+        @include vibrant-text;
+    }
+
+    // Condensed: tighter and a stronger fill so content scrolling beneath stays legible
+    &.lg-header-condensed {
+        background-color: var(--lg-glass-frosted-fill);
+
+        .headerTop {
+            padding-top: 0.2em;
+            padding-bottom: 0.2em;
+        }
+    }
+
+    // Backdrop pages: clear glass over the artwork with a dim layer for legibility
+    &.semiTransparent {
+        @include glass(clear);
+
+        background-color: var(--lg-dim);
+        backdrop-filter: blur(var(--lg-glass-clear-blur)) saturate(var(--lg-glass-saturate)) !important;
+    }
+
+    // Section tabs: state is text colour plus an underline, never colour alone
+    .emby-tab-button-active {
+        color: var(--lg-accent-text);
+        box-shadow: inset 0 -2px 0 var(--lg-accent-text);
+        font-weight: 600;
+    }
+}
+
+// Desktop: section tabs sit centred inside the top bar (tvOS top-bar pattern) instead of a second row,
+// so the capsule stays one row tall. Narrow layouts keep the stock second row.
+@media (min-width: 62.5em) {
+    .layout-desktop .skinHeader {
+        .headerTabs {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            display: flex;
+            align-items: center;
+            width: max-content;
+            max-width: 46%;
+            margin: 0;
+            transform: translateX(-50%);
+        }
+
+        .emby-tab-button {
+            @include press;
+
+            min-height: 36px;
+            margin: 0 var(--lg-space-1);
+            padding: 0.4em 1.1em;
+            border-radius: var(--lg-radius-pill);
+            color: var(--lg-text-secondary);
+        }
+
+        .emby-tab-button:hover {
+            color: var(--lg-text);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        // Active: filled pill + weight (not colour alone)
+        .emby-tab-button-active {
+            color: var(--lg-text);
+            background-color: rgba(255, 255, 255, 0.16);
+            box-shadow: none;
+        }
+    }
+
+    // One-row header: pages clear the capsule only (stock reserves a second row for the tabs)
+    .layout-desktop .libraryPage:not(.noSecondaryNavPage) {
+        padding-top: $lg-header-clearance !important;
+    }
+
+    .layout-desktop .absolutePageTabContent {
+        top: $lg-header-clearance !important;
+    }
+}
+
+// Phones with the tab bar: the tab bar owns the top-level destinations (tab-bars.md), so the header
+// drops its duplicates — Search and Profile buttons everywhere, and Home/Favorites tabs on the home page
+// (other pages keep their section tabs, e.g. a library's Movies/Genres). No :has() = both stay (harmless).
+.layout-mobile.lg-has-tabbar {
+    // Feeds _player.scss: .nowPlayingBar bottom = safe-area + this offset + 12px
+    --lg-tabbar-offset: calc(#{$lg-tabbar-height} + var(--lg-space-3));
+
+    .skinHeader .headerSearchButton,
+    .skinHeader .headerUserButton {
+        display: none;
+    }
+
+    &:has(#indexPage:not(.hide)) .skinHeader .headerTabs {
+        display: none;
+    }
+
+    // ...and home stops reserving room for that tab row
+    #indexPage:not(.noSecondaryNavPage) {
+        padding-top: $lg-header-clearance !important;
+    }
+}
+
+// Overrides the stock opaque-header rule above on pages with transparent header over artwork
+.skinHeader.semiTransparent.lg-header-condensed {
+    background-color: var(--lg-glass-clear-fill);
+}
+
+// The stock mobile headroom slides by its own height; add the inset so the capsule fully leaves
+.headroom--unpinned.skinHeader {
+    transform: translateY(calc(-100% - #{$lg-header-inset} - env(safe-area-inset-top)));
+}
+
+// Video OSD and TV keep their own header behaviour
+.skinHeader.osdHeader {
+    right: 0;
+    left: 0;
+    top: 0;
+    margin-top: 0;
+    border-radius: 0;
+}
+
+.layout-tv .skinHeader {
+    top: 0;
+    right: 0;
+    left: 0;
+    margin-top: 0;
+    border-radius: 0;
+}
+
+// ---------------------------------------------------------------- Drawer
+.mainDrawer {
+    @include glass(regular);
+
+    border-radius: 0 var(--lg-radius-xl) var(--lg-radius-xl) 0;
+    border-left-width: 0;
+
+    [dir='rtl'] & {
+        border-radius: var(--lg-radius-xl) 0 0 var(--lg-radius-xl);
+        border-left-width: 1px;
+        border-right-width: 0;
+    }
+
+    .sidebarHeader {
+        color: var(--lg-text-secondary);
+    }
+
+    .navMenuOption {
+        @include press;
+        @include focus-ring(var(--lg-radius-md), -2px);
+        @include hit-target;
+
+        color: var(--lg-text);
+        margin: 0 var(--lg-space-2) !important;
+        border-radius: var(--lg-radius-md) !important;
+
+        @media (hover: hover) {
+            &:hover {
+                background: var(--lg-surface-3);
+            }
+        }
+    }
+
+    // Selected: soft accent fill + accent text + weight and an indicator bar (not colour alone)
+    .navMenuOption-selected {
+        background: var(--lg-accent-soft) !important;
+        color: var(--lg-accent-text);
+        font-weight: 600 !important;
+        box-shadow: inset 3px 0 0 var(--lg-accent-text);
+
+        [dir='rtl'] & {
+            box-shadow: inset -3px 0 0 var(--lg-accent-text);
+        }
+    }
+}
+
+// Dashboard keeps its docked drawer without the floating radius
+.dashboardDocument .mainDrawer {
+    border-radius: 0;
+}
+
+// ---------------------------------------------------------------- Bottom tab bar (mobile only)
+.lg-tabbar {
+    @include glass(regular);
+
+    display: none;
+}
+
+.layout-mobile {
+    // Page content must clear the floating bar
+    &.lg-has-tabbar body {
+        padding-bottom: calc(#{$lg-tabbar-height} + var(--lg-space-4) + env(safe-area-inset-bottom));
+    }
+
+    .lg-tabbar:not([hidden]) {
+        position: fixed;
+        z-index: 1000;
+        right: var(--lg-gutter);
+        bottom: calc(var(--lg-space-3) + env(safe-area-inset-bottom));
+        left: var(--lg-gutter);
+        display: flex;
+        justify-content: space-around;
+        gap: var(--lg-space-1);
+        height: $lg-tabbar-height;
+        padding: var(--lg-space-1);
+        border-radius: var(--lg-radius-pill);
+    }
+
+    .lg-tabbar-item {
+        @include hit-target;
+        @include press;
+        @include focus-ring(var(--lg-radius-pill), -2px);
+
+        display: flex;
+        flex: 1 1 0;
+        min-width: 44px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 0 var(--lg-space-1);
+        border: 0;
+        border-radius: var(--lg-radius-pill);
+        background: transparent;
+        color: var(--lg-text-secondary);
+        font: inherit;
+        font-size: 0.6875rem;
+        line-height: 1.1;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &[aria-current='page'] {
+            background: var(--lg-accent-soft);
+            color: var(--lg-accent-text);
+            font-weight: 600;
+        }
+    }
+
+    .lg-tabbar-icon {
+        font-size: 1.5rem;
+    }
+
+    .lg-tabbar-label {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}

@@ -1,0 +1,162 @@
+// search — Search field capsule, result sections, loading/empty states.
+// Owned by task T6. Glass only on the functional layer; use the mixins, never hand-written blur.
+@use 'mixins' as *;
+
+$search-height: 48px;
+$search-height-compact: 44px;
+
+// Section rhythm: everything on the search page aligns to the shared gutter.
+.searchFields {
+    padding-top: var(--lg-space-4);
+    padding-bottom: var(--lg-space-4);
+}
+
+.searchFields.padded-left {
+    padding-left: var(--lg-gutter);
+}
+
+.searchFields.padded-right {
+    padding-right: var(--lg-gutter);
+}
+
+// The field is a control floating over content, so it is allowed to be glass (regular).
+// The dim layer sits above the fill so text keeps >= 4.5:1 even over a bright backdrop.
+.searchFieldsInner {
+    @include glass(regular, false);
+
+    background-image: linear-gradient(var(--lg-dim), var(--lg-dim)), var(--lg-glass-sheen);
+    align-items: center;
+    gap: var(--lg-space-3);
+    box-sizing: border-box;
+    height: $search-height;
+    padding: 0 var(--lg-space-4);
+    border-radius: var(--lg-radius-pill);
+    transition: box-shadow var(--lg-dur-focus) var(--lg-ease-out), border-color var(--lg-dur-focus) var(--lg-ease-out);
+
+    @media (max-width: 40em) {
+        height: $search-height-compact;
+        padding: 0 var(--lg-space-3);
+    }
+
+    // Focus = soft accent ring on the capsule, no harsh inner border.
+    &:focus-within {
+        border-color: var(--lg-accent);
+        box-shadow: inset 0 1px 0 var(--lg-glass-specular), 0 0 0 4px var(--lg-accent-soft);
+    }
+}
+
+.searchfields-icon {
+    align-self: center;
+    flex-shrink: 0;
+    margin: 0;
+    color: var(--lg-text-secondary);
+    font-size: 1.5rem;
+}
+
+// The capsule owns the chrome; the input inside is plain text.
+.searchFieldsInner .inputContainer {
+    margin: 0;
+    height: 100%;
+    min-width: 0;
+}
+
+// The stock floating label reserves a line above the text and pushes it to the capsule's bottom edge.
+// Keep it for assistive tech, take it out of layout.
+.searchFieldsInner .inputLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.searchFieldsInner .searchfields-txtSearch {
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--lg-text);
+    font-size: var(--lg-type-headline);
+    letter-spacing: var(--lg-track-body);
+
+    &:focus {
+        border-color: transparent !important;
+        box-shadow: none;
+    }
+
+    &::placeholder {
+        color: var(--lg-text-secondary);
+        opacity: 1;
+    }
+}
+
+// Suggestions and results: content layer (opaque, no glass), aligned to the gutter.
+.searchSuggestions .sectionTitle.padded-left,
+.searchSuggestionsList.padded-left,
+.searchResults .sectionTitle.padded-left {
+    padding-left: var(--lg-gutter);
+}
+
+.searchSuggestions .sectionTitle.padded-right,
+.searchSuggestionsList.padded-right,
+.searchResults .sectionTitle.padded-right {
+    padding-right: var(--lg-gutter);
+}
+
+.searchSuggestionsList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lg-space-2);
+
+    // Suggestions read as quiet pills
+    .button-link {
+        @include press;
+        @include focus-ring(var(--lg-radius-pill));
+
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--lg-hit-min);
+        padding: 0 var(--lg-space-4);
+        border-radius: var(--lg-radius-pill);
+        background: var(--lg-surface-2);
+
+        // Neutral, not accent: accent is reserved for primary actions and selection (beats _base .button-link)
+        color: var(--lg-text) !important;
+    }
+}
+
+// Heading aligns with its pills (stock centres it)
+.searchSuggestions .sectionTitle {
+    text-align: start;
+}
+
+// Empty / no-results message: centred, secondary text, readable on narrow screens.
+.searchResults .noItemsMessage.centerMessage {
+    box-sizing: border-box;
+    width: min(100%, 32em);
+    padding: var(--lg-space-8) var(--lg-gutter);
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-body);
+    line-height: 1.5;
+    text-align: center;
+
+    a {
+        @include hit-target;
+
+        display: inline-flex;
+        align-items: center;
+        margin-top: var(--lg-space-3);
+        color: var(--lg-link);
+    }
+}
+
+// Loading: stock spinner in the accent (white). (All four layers share the colour.)
+.mdl-spinner__layer-1,
+.mdl-spinner__layer-2,
+.mdl-spinner__layer-3,
+.mdl-spinner__layer-4 {
+    border-color: var(--lg-accent-text);
+}

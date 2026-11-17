@@ -1,11 +1,13 @@
 import layoutManager from 'components/layoutManager';
 import { getUserViewsQuery } from 'hooks/useUserViews';
 import globalize from 'lib/globalize';
+import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
 import { DEFAULT_SECTIONS, HomeSectionType } from 'types/homeSectionType';
 import Dashboard from 'utils/dashboard';
 import { toApi } from 'utils/jellyfin-apiclient/compat';
 import { queryClient } from 'utils/query/queryClient';
 
+import { destroyHero, mountHero, pauseHero, resumeHero } from './hero/hero';
 import { loadRecordings } from './sections/activeRecordings';
 import { loadLibraryButtons } from './sections/libraryButtons';
 import { loadLibraryTiles } from './sections/libraryTiles';
@@ -71,6 +73,11 @@ export function loadSections(elem, apiClient, user, userSettings) {
                 elem.innerHTML = html;
                 elem.classList.add('homeSectionsContainer');
 
+                if (isLiquidGlass()) {
+                    // Fire and forget: the hero fills itself in (or renders nothing) without delaying the sections.
+                    void mountHero(elem, apiClient);
+                }
+
                 const promises = [];
                 const sections = getAllSectionsToShow(userSettings, userSectionCount);
                 for (let i = 0; i < sections.length; i++) {
@@ -110,6 +117,8 @@ export function loadSections(elem, apiClient, user, userSettings) {
 }
 
 export function destroySections(elem) {
+    destroyHero(elem);
+
     const elems = elem.querySelectorAll('.itemsContainer');
     for (const e of elems) {
         e.fetchData = null;
@@ -121,6 +130,7 @@ export function destroySections(elem) {
 }
 
 export function pause(elem) {
+    pauseHero(elem);
     const elems = elem.querySelectorAll('.itemsContainer');
     for (const e of elems) {
         e.pause();
@@ -128,6 +138,7 @@ export function pause(elem) {
 }
 
 export function resume(elem, options) {
+    resumeHero(elem);
     const elems = elem.querySelectorAll('.itemsContainer');
     const promises = [];
 

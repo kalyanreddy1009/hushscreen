@@ -1,0 +1,480 @@
+// cards — Cards (lift, radii, progress, watched) and rails (snap, edge padding, scroll buttons).
+// Owned by task T3. Glass only on the functional layer; use the mixins, never hand-written blur.
+// Cards are CONTENT: opaque artwork, shadow + scale + sheen. Only the small overlay buttons and the
+// rail arrows are glass (they are controls).
+@use 'mixins' as *;
+
+// Room a lifted card needs above/below the rail so the scroller (overflow-y: hidden) never clips it.
+$rail-pad-top: 1.75rem;
+$rail-pad-bottom: 2.75rem;
+
+// ---------------------------------------------------------------------------
+// 1. Card shell: no clipping of the lift, stock focus animation removed
+// ---------------------------------------------------------------------------
+
+.card {
+    position: relative;
+}
+
+// Stock `contain: paint` clips the scaled card and its shadow to the card box.
+html .card:not(.show-animation) {
+    contain: layout style;
+}
+
+html .card:hover {
+    z-index: 5;
+}
+
+html .card:focus,
+html .card:focus-within {
+    z-index: 10;
+}
+
+// Stock scale-on-focus on the box and the 0.5em focus border are replaced by the lift below.
+html .card.show-animation:focus > .cardBox {
+    transform: none;
+}
+
+// ---------------------------------------------------------------------------
+// 2. Artwork: radii, clean clipped corners, inner edge, resting shadow
+// ---------------------------------------------------------------------------
+.cardScalable {
+    border-radius: var(--lg-radius-md);
+    overflow: hidden;
+    box-shadow: var(--lg-shadow-1);
+    transform-origin: center bottom;
+    transition:
+        transform var(--lg-dur-spring) var(--lg-ease-spring),
+        box-shadow var(--lg-dur-focus) var(--lg-ease-out);
+
+    // Subtle 1px inner edge so dark artwork still reads against the dark canvas
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border-radius: inherit;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        pointer-events: none;
+    }
+
+    // Specular sheen, revealed on lift
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border-radius: inherit;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 28%, rgba(255, 255, 255, 0) 55%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 40%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--lg-dur-focus) var(--lg-ease-out);
+    }
+}
+
+.cardOverlayContainer {
+    background: var(--lg-dim);
+}
+
+.cardImageContainer,
+.cardContent,
+.cardPadder,
+.blurhash-canvas,
+.cardOverlayContainer {
+    border-radius: var(--lg-radius-md);
+}
+
+// Cards with a visible footer box (cardLayout): artwork rounds on top, footer closes the shape
+.visualCardBox {
+    border-radius: var(--lg-radius-md);
+    overflow: hidden;
+    background-color: var(--lg-bg-elevated);
+
+    .cardScalable {
+        border-radius: var(--lg-radius-md) var(--lg-radius-md) 0 0;
+        box-shadow: none;
+    }
+
+    .cardImageContainer,
+    .cardContent,
+    .blurhash-canvas,
+    .cardOverlayContainer {
+        border-radius: var(--lg-radius-md) var(--lg-radius-md) 0 0;
+    }
+}
+
+.cardBox.visualCardBox {
+    transform-origin: center bottom;
+    transition:
+        transform var(--lg-dur-spring) var(--lg-ease-spring),
+        box-shadow var(--lg-dur-focus) var(--lg-ease-out);
+    box-shadow: var(--lg-shadow-1);
+}
+
+.cardPadder {
+    background-color: var(--lg-surface-2);
+}
+
+.cardBox:not(.visualCardBox) .cardPadder,
+.cardContent-shadow {
+    box-shadow: none;
+}
+
+// ---------------------------------------------------------------------------
+// 3. tvOS lift: hover (fine pointers), keyboard focus, TV remote focus; press feedback
+// ---------------------------------------------------------------------------
+@mixin card-lifted {
+    transform: scale(var(--lg-lift-scale));
+    box-shadow: var(--lg-shadow-lift);
+    will-change: transform;
+
+    &::after {
+        opacity: 1;
+    }
+}
+
+@mixin card-focus-ring {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .card:hover .cardBox:not(.visualCardBox) .cardScalable,
+    .card:hover .cardBox.visualCardBox {
+        @include card-lifted;
+    }
+}
+
+.card:focus-visible .cardBox:not(.visualCardBox) .cardScalable,
+.card:focus-visible .cardBox.visualCardBox,
+.layout-tv .card:focus .cardBox:not(.visualCardBox) .cardScalable,
+.layout-tv .card:focus .cardBox.visualCardBox {
+    @include card-lifted;
+    @include card-focus-ring;
+}
+
+// Keyboard focus landing on the inner link/button of a card (does not match for mouse clicks).
+// Kept as its own rule: a browser without :has() must not drop the rules above.
+.card:has(:focus-visible) .cardBox:not(.visualCardBox) .cardScalable,
+.card:has(:focus-visible) .cardBox.visualCardBox {
+    @include card-lifted;
+    @include card-focus-ring;
+}
+
+// Press feedback on pointer-down
+.card:active .cardBox:not(.visualCardBox) .cardScalable,
+.card:active .cardBox.visualCardBox {
+    transform: scale(var(--lg-press-scale));
+    transition-duration: var(--lg-dur-micro);
+}
+
+html .card.show-focus:not(.show-animation) .cardBox:not(.visualCardBox) .cardScalable,
+html .card.show-focus:not(.show-animation) .cardBox.visualCardBox {
+    border: 0;
+    border-radius: var(--lg-radius-md);
+}
+
+html .card.show-focus:not(.show-animation) .cardBox {
+    margin: 0.6em;
+}
+
+@media (prefers-contrast: more) {
+    .cardScalable::before {
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Card text
+// ---------------------------------------------------------------------------
+.cardText {
+    color: var(--lg-text);
+    font-size: var(--lg-type-footnote);
+    letter-spacing: var(--lg-track-small);
+    text-align: start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cardText-first {
+    font-weight: 600;
+    color: var(--lg-text);
+    letter-spacing: var(--lg-track-body);
+}
+
+.cardText-secondary {
+    font-weight: 400;
+    color: var(--lg-text-secondary);
+}
+
+.cardFooter {
+    padding-block: var(--lg-space-2);
+    padding-inline: var(--lg-space-1);
+}
+
+.visualCardBox .cardFooter {
+    padding-inline: var(--lg-space-3);
+}
+
+// Placeholder (no artwork): background classes come from _base; centre a quiet glyph / label
+.cardImageContainer > .cardDefaultText,
+.cardImageContainer .cardImageIcon,
+.cardPadder .cardImageIcon {
+    color: var(--lg-text-secondary);
+}
+
+.cardImageContainer > .cardDefaultText {
+    padding: var(--lg-space-3);
+    text-align: center;
+    font-size: var(--lg-type-callout);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Progress + indicators
+// ---------------------------------------------------------------------------
+.itemProgressBar {
+    height: 4px;
+    margin-block: 0 var(--lg-space-3);
+    margin-inline: var(--lg-space-3);
+    border-radius: var(--lg-radius-pill);
+    background: rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+}
+
+.itemProgressBarForeground {
+    border-radius: var(--lg-radius-pill);
+    background-color: var(--lg-accent);
+}
+
+// Outside the artwork (footer below the card) the bar sits flush with the text column
+.cardFooter .itemProgressBar {
+    margin-inline: 0;
+    margin-block: var(--lg-space-1) 0;
+}
+
+.cardIndicators {
+    top: var(--lg-space-2);
+    gap: var(--lg-space-1);
+
+    [dir="ltr"] & {
+        right: var(--lg-space-2);
+    }
+
+    [dir="rtl"] & {
+        left: var(--lg-space-2);
+    }
+}
+
+// Black 88% on white 92% (--lg-on-accent on --lg-accent) = 14.5:1
+.cardIndicators .countIndicator,
+.cardIndicators .playedIndicator {
+    min-width: 1.5rem;
+    height: 1.5rem;
+    width: auto;
+    padding-inline: 0.4em;
+    border-radius: var(--lg-radius-pill);
+    background-color: var(--lg-accent);
+    color: var(--lg-on-accent);
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.cardIndicators .playedIndicator {
+    width: 1.5rem;
+    padding-inline: 0;
+}
+
+.cardIndicators .indicatorIcon {
+    font-size: 1rem;
+}
+
+// ---------------------------------------------------------------------------
+// 6. Overlay buttons (content: opaque circular discs, 44px targets, no glass)
+// ---------------------------------------------------------------------------
+.cardOverlayButton {
+    @include hit-target;
+    padding: 0;
+    color: var(--lg-text);
+}
+
+.cardOverlayButton-br {
+    inset-block-end: var(--lg-space-2);
+
+    [dir="ltr"] & {
+        right: var(--lg-space-2);
+    }
+
+    [dir="rtl"] & {
+        left: var(--lg-space-2);
+    }
+}
+
+@mixin overlay-disc {
+    border: 1px solid var(--lg-glass-edge);
+    background-color: rgba(20, 20, 26, 0.78) !important;
+    backdrop-filter: none;
+    box-shadow: var(--lg-shadow-1);
+}
+
+html .cardOverlayButtonIcon {
+    @include overlay-disc;
+    @include press;
+    width: var(--lg-hit-min) !important;
+    height: var(--lg-hit-min) !important;
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+    font-size: 1.5rem !important;
+}
+
+// Centred play button: bigger opaque disc; the button is the disc, the inner icon is plain
+html .cardOverlayButton-centered {
+    @include overlay-disc;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: -1.75rem 0 0 -1.75rem;
+    padding: 0 !important;
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+    transition: transform var(--lg-dur-micro) var(--lg-ease-out);
+
+    &:active {
+        transform: scale(var(--lg-press-scale));
+    }
+
+    .cardOverlayButtonIcon {
+        width: 100% !important;
+        height: 100% !important;
+        border: 0;
+        background: transparent !important;
+        box-shadow: none;
+        backdrop-filter: none;
+    }
+}
+
+html .cardOverlayContainer > .cardOverlayFab-primary {
+    @include overlay-disc;
+    color: var(--lg-text);
+
+    &:hover {
+        transform: scale(1.1);
+    }
+}
+
+.cardOverlayButton:focus-visible,
+.layout-tv .cardOverlayButton:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 2px;
+    border-radius: var(--lg-radius-pill);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Rails: gutter alignment, spacing, snap, room for the lift
+// ---------------------------------------------------------------------------
+// Scoped to section titles / non-scrolling item grids inside .verticalSection so forms, dialogs,
+// settings and dashboard pages keep their stock padding.
+html[dir] .verticalSection :is(.sectionTitleContainer, .sectionTitle, .itemsContainer).padded-left {
+    padding-inline-start: max(var(--lg-gutter), env(safe-area-inset-left));
+}
+
+html[dir] .verticalSection :is(.sectionTitleContainer, .sectionTitle, .itemsContainer).padded-right {
+    padding-inline-end: max(var(--lg-gutter), env(safe-area-inset-right));
+}
+
+// Vertical room (padding + matching negative margin) so the scroller's overflow-y: hidden
+// does not clip the lifted card or its shadow, without changing the rail's layout height.
+// Horizontal rails only: vertical scrollers (TV guide, data-horizontal="false") and .no-padding are skipped.
+html[dir] .emby-scroller:not([data-horizontal="false"]):not(.no-padding) {
+    padding-inline: max(var(--lg-gutter), env(safe-area-inset-left)) max(var(--lg-gutter), env(safe-area-inset-right));
+    padding-block: $rail-pad-top $rail-pad-bottom;
+    margin-block: (-$rail-pad-top) (-$rail-pad-bottom);
+    scroll-padding-inline: var(--lg-gutter);
+}
+
+// TV keeps the existing focus-driven scrolling: snap on non-TV layouts only
+html[dir]:not(.layout-tv) .emby-scroller:not([data-horizontal="false"]):not(.no-padding) {
+    scroll-snap-type: x proximity;
+}
+
+.itemsContainer.scrollSlider {
+    gap: var(--lg-space-3);
+    padding-inline: 0;
+}
+
+// First card aligns with the title; spacing comes from `gap`, not per-card margins
+html[dir] .itemsContainer.scrollSlider > .card > .cardBox {
+    margin-inline: 0;
+}
+
+.itemsContainer.scrollSlider > .card {
+    scroll-snap-align: start;
+}
+
+// ---------------------------------------------------------------------------
+// 8. Rail arrows (glass capsules, desktop hover only)
+// ---------------------------------------------------------------------------
+.emby-scrollbuttons {
+    gap: var(--lg-space-2);
+    padding-top: 0;
+    opacity: 0;
+    transition: opacity var(--lg-dur-glass) var(--lg-ease-out);
+
+    [dir="ltr"] & {
+        right: var(--lg-gutter);
+    }
+
+    [dir="rtl"] & {
+        left: var(--lg-gutter);
+    }
+}
+
+.layout-tv .emby-scrollbuttons {
+    display: none;
+}
+
+.emby-scroller-container:hover > .emby-scrollbuttons,
+.emby-scroller-container:focus-within > .emby-scrollbuttons {
+    opacity: 1;
+}
+
+.emby-scrollbuttons-button {
+    @include glass(clear);
+    @include hit-target;
+    @include press;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text);
+
+    &:disabled {
+        opacity: 0.35;
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.92);
+        outline-offset: 2px;
+    }
+}
+
+// Touch devices scroll by swipe, TV by remote: no arrows
+@media (hover: none), (pointer: coarse) {
+    .emby-scrollbuttons {
+        display: none;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 9. Reduced motion: lift scale is already 1 via tokens; keep the shadow change
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+    .cardScalable,
+    .cardBox.visualCardBox,
+    .emby-scrollbuttons {
+        transition-duration: var(--lg-dur-micro);
+    }
+}
