@@ -63,3 +63,74 @@
     align-items: center;
     gap: var(--lg-space-1) 0.375rem;
 }
+
+// Official Dolby / DTS logos. Monochrome: a mask painted in currentColor, so they follow the info line.
+// Without mask support, or in forced colors, the badge keeps its text label instead.
+.lg-badge--logo {
+    border: 0;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    vertical-align: middle;
+    color: inherit;
+}
+
+@supports (mask-image: url('')) or (-webkit-mask-image: url('')) {
+    .lg-badge--logo {
+        display: inline-block;
+        box-sizing: content-box;
+        height: 1.8em;
+        overflow: hidden;
+        white-space: nowrap;
+        text-indent: 200%;
+        background-color: currentColor;
+        mask: var(--lg-logo) center / contain no-repeat;
+    }
+
+    .lg-badge--logo-dolby-vision {
+        --lg-logo: url('badges/dolby-vision.svg');
+        aspect-ratio: 1051 / 393;
+    }
+
+    // Single-line mark, so it sits smaller than the two-line logos
+    .lg-badge--logo-dolby-atmos {
+        --lg-logo: url('badges/dolby-atmos.svg');
+        height: 1.35em;
+        aspect-ratio: 110.76 / 15.643;
+    }
+
+    .lg-badge--logo-dolby-digital-plus {
+        --lg-logo: url('badges/dolby-digital-plus.svg');
+        aspect-ratio: 364.5 / 85.816;
+    }
+
+    .lg-badge--logo-dolby-digital {
+        --lg-logo: url('badges/dolby-digital.svg');
+        aspect-ratio: 308.25 / 76.25;
+    }
+
+    .lg-badge--logo-dolby-truehd {
+        --lg-logo: url('badges/dolby-truehd.svg');
+        aspect-ratio: 224.865 / 55.021;
+    }
+
+    .lg-badge--logo-dts {
+        --lg-logo: url('badges/dts.svg');
+        aspect-ratio: 344.619 / 135.127;
+    }
+
+    .lg-badge--logo-dts-hd-ma {
+        --lg-logo: url('badges/dts-hd-ma.svg');
+        aspect-ratio: 330 / 114;
+    }
+}
+
+@media (forced-colors: active) {
+    .lg-badge--logo {
+        text-indent: 0;
+        mask: none;
+        background: none;
+        height: auto;
+        aspect-ratio: auto;
+    }
+}

@@ -1,5 +1,7 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import type { MediaStream } from '@jellyfin/sdk/lib/generated-client/models/media-stream';
+import { readdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 // Faithful subset of mediainfo.getResolutionText (the real module pulls in the whole UI stack).
@@ -133,6 +135,65 @@ describe('getQualityBadges', () => {
         ]);
         expect(ids(item)).toEqual([ '4k', 'hdr', 'atmos', 'ch71', 'sdh' ]);
     });
+
+    it('labels DTS-HD MA with its channel badge', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'dts', Profile: 'DTS-HD MA', Channels: 8 }) ])).map(b => b.label)).toEqual([ 'DTS-HD MA', '7.1' ]);
+    });
+
+    it('labels plain DTS with its channel badge', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'dts', Profile: 'DTS', Channels: 6 }) ])).map(b => b.label)).toEqual([ 'DTS', '5.1' ]);
+    });
+
+    it('labels DTS-HD HRA', () => {
+        expect(ids(itemWith([ audio({ Codec: 'dts', Profile: 'DTS-HD HRA' }) ]))).toEqual([ 'dtshd' ]);
+    });
+
+    it('labels Dolby TrueHD with its channel badge', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'truehd', Channels: 8 }) ])).map(b => b.label)).toEqual([ 'TrueHD', '7.1' ]);
+    });
+
+    it('shows Atmos without TrueHD when TrueHD is Atmos', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'truehd', DisplayTitle: 'TrueHD Atmos 7.1', Channels: 8 }) ])).map(b => b.label)).toEqual([ 'Dolby Atmos', '7.1' ]);
+    });
+
+    it('detects Atmos on a non-default audio track', () => {
+        const item = {
+            MediaSources: [{
+                DefaultAudioStreamIndex: 1,
+                MediaStreams: [
+                    audio({ Index: 1, Codec: 'aac', Channels: 2 }),
+                    audio({ Index: 2, Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos', Channels: 6 })
+                ]
+            }]
+        } as BaseItemDto;
+        expect(ids(item)).toEqual([ 'atmos', 'ch51' ]);
+    });
+
+    it('shows every audio format present on any track, in fixed order', () => {
+        const streams = [
+            audio({ Index: 1, Codec: 'eac3', Profile: 'Dolby Digital Plus + Dolby Atmos', Channels: 6 }),
+            audio({ Index: 2, Codec: 'dts', Profile: 'DTS:X', Channels: 8 }),
+            audio({ Index: 3, Codec: 'dts', Profile: 'DTS-HD MA', Channels: 8 }),
+            audio({ Index: 4, Codec: 'ac3', Channels: 6 }),
+            audio({ Index: 5, Codec: 'aac', Channels: 2 })
+        ];
+        expect(ids(itemWith(streams))).toEqual([ 'atmos', 'dtsx', 'dtshdma', 'dd', 'ch71' ]);
+    });
+
+    it('collapses duplicate formats into one badge', () => {
+        expect(ids(itemWith([
+            audio({ Index: 1, Codec: 'ac3', Channels: 6 }),
+            audio({ Index: 2, Codec: 'ac3', Channels: 6 })
+        ]))).toEqual([ 'dd', 'ch51' ]);
+    });
+
+    it('labels Dolby Digital Plus without Atmos', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'eac3', Channels: 6 }) ])).map(b => b.label)).toEqual([ 'Dolby Digital+', '5.1' ]);
+    });
+
+    it('labels Dolby Digital as a format and shows the 5.1 channel badge', () => {
+        expect(getQualityBadges(itemWith([ audio({ Codec: 'ac3', Channels: 6, DisplayTitle: 'Dolby Digital - 5.1' }) ])).map(b => b.label)).toEqual([ 'Dolby Digital', '5.1' ]);
+    });
 });
 
 describe('getImdbUrl', () => {
@@ -188,5 +249,86 @@ describe('renderInfoBadgesHtml', () => {
         expect(html).not.toContain('<b');
         expect(html).not.toContain('onclick');
         expect(parse(html).querySelectorAll('b')).toHaveLength(0);
+    });
+});
+
+describe('logo badges', () => {
+    const BADGE_DIR = resolve(process.cwd(), 'src/themes/liquidglass/badges');
+
+    function render(html: string): HTMLDivElement {
+        const root = document.createElement('div');
+        root.insertAdjacentHTML('beforeend', html);
+        return root;
+    }
+
+    function hdrBadge(VideoRangeType: string) {
+        return getQualityBadges(itemWith([ video({ VideoRangeType } as Partial<MediaStream>) ])).find(b => b.id === 'hdr');
+    }
+
+    function logoFor(streams: MediaStream[]): string | undefined {
+        return getQualityBadges(itemWith(streams)).find(b => b.logo)?.logo;
+    }
+
+    it('renders Dolby Atmos as a monochrome logo badge with its full name', () => {
+        const root = render(renderInfoBadgesHtml(itemWith([ audio({ Profile: 'Dolby Atmos' }) ])));
+        const el = root.querySelector('.lg-badge--logo-dolby-atmos');
+        expect(el?.className).toBe('lg-badge lg-badge--logo lg-badge--logo-dolby-atmos');
+        expect(el?.getAttribute('aria-label')).toBe('Dolby Atmos');
+        expect(el?.textContent).toBe('Dolby Atmos');
+    });
+
+    it('gives the Dolby Vision HDR badge the dolby-vision logo', () => {
+        expect(hdrBadge('DOVI')).toEqual({ id: 'hdr', label: 'Dolby Vision', title: 'Dolby Vision', logo: 'dolby-vision' });
+    });
+
+    it('gives HDR10 no logo and renders no logo markup', () => {
+        const badge = hdrBadge('HDR10');
+        expect(badge).toEqual({ id: 'hdr', label: 'HDR10', title: 'HDR10' });
+        expect(badge).not.toHaveProperty('logo');
+        expect(renderInfoBadgesHtml(itemWith([ video({ VideoRangeType: 'HDR10' } as Partial<MediaStream>) ]))).not.toContain('lg-badge--logo');
+    });
+
+    it.each([
+        [ [ audio({ Codec: 'dts', Profile: 'DTS-HD MA', Channels: 8 }) ], 'dts-hd-ma' ],
+        [ [ audio({ Codec: 'dts', Profile: 'DTS', Channels: 6 }) ], 'dts' ],
+        [ [ audio({ Codec: 'eac3', Channels: 6 }) ], 'dolby-digital-plus' ],
+        [ [ audio({ Codec: 'ac3', Channels: 6 }) ], 'dolby-digital' ],
+        [ [ audio({ Codec: 'truehd', Channels: 8 }) ], 'dolby-truehd' ],
+        [ [ audio({ Profile: 'Dolby Atmos' }) ], 'dolby-atmos' ]
+    ])('assigns the matching logo for audio streams %#', (streams, logo) => {
+        expect(logoFor(streams)).toBe(logo);
+    });
+
+    it.each([
+        [ [ audio({ Codec: 'dts', Profile: 'DTS:X', Channels: 6 }) ] ],
+        [ [ audio({ Channels: 8 }) ] ],
+        [ [ audio({ Channels: 6 }) ] ],
+        [ [ video({ Width: 3840, Height: 2160 }) ] ],
+        [ [ sub({ IsHearingImpaired: true }) ] ]
+    ])('gives no logo to non-logo badges %#', streams => {
+        expect(logoFor(streams)).toBeUndefined();
+    });
+
+    it('gives no logo to DTS-HD HRA', () => {
+        expect(logoFor([ audio({ Codec: 'dts', Profile: 'DTS-HD HRA' }) ])).toBeUndefined();
+    });
+
+    it('has a badge file for every logo used and only safe svg content', () => {
+        const files = readdirSync(BADGE_DIR);
+        const logos = [ 'dolby-vision', 'dolby-atmos', 'dolby-digital-plus', 'dolby-digital', 'dolby-truehd', 'dts', 'dts-hd-ma' ];
+
+        for (const logo of logos) {
+            expect(files).toContain(`${logo}.svg`);
+        }
+        for (const file of files) {
+            const svg = readFileSync(resolve(BADGE_DIR, file), 'utf8');
+            expect(svg.startsWith('<svg')).toBe(true);
+            expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
+            expect(svg).toContain('viewBox=');
+            expect(svg).not.toContain('<script');
+            expect(svg).not.toMatch(/\son[a-z]+=/i);
+            expect(svg).not.toContain('href=');
+            expect(svg).not.toContain('<image');
+        }
     });
 });
