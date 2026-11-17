@@ -23,6 +23,7 @@ import { appRouter } from 'components/router/appRouter';
 import itemShortcuts from 'components/shortcuts';
 import { AppFeature } from 'constants/appFeature';
 import { renderInfoBadgesHtml } from 'components/liquidglass/qualityBadges';
+import { applyDetailsExtras } from 'components/liquidglass/detailsInfo';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import browser from 'scripts/browser';
@@ -508,7 +509,24 @@ function setTrailerButtonVisibility(page, item) {
     }
 }
 
-function renderBackdrop(page, item) {
+function renderBackdrop(page, item, apiClient) {
+    if (isLiquidGlass() && !layoutManager.mobile && !layoutManager.tv) {
+        const hasBanner = renderHeaderBackdrop(page, item, apiClient);
+        page.classList.toggle('lg-details-banner', hasBanner);
+        if (hasBanner) {
+            clearBackdrop();
+            return;
+        }
+
+        // No banner image for this item: reset the header backdrop and fall through to the stock desktop backdrop.
+        const itemBackdropElement = page.querySelector('#itemBackdrop');
+        if (itemBackdropElement) {
+            itemBackdropElement.style.backgroundImage = '';
+        }
+    }
+
+    page.classList.remove('lg-details-banner');
+
     if (!layoutManager.mobile && dom.getWindowSize().innerWidth >= 1000) {
         const isBannerEnabled = !layoutManager.tv && userSettings.detailsBanner();
         // If backdrops are disabled, but the header banner is enabled, add a class to the page to disable the transparency
@@ -561,11 +579,12 @@ function reloadFromItem(instance, page, params, item, user) {
         renderHeaderBackdrop(page, item, apiClient);
     }
 
-    renderBackdrop(page, item);
+    renderBackdrop(page, item, apiClient);
 
     // Render the main information for the item
     renderName(item, page.querySelector('.nameContainer'), params.context);
     renderDetails(page, item, apiClient, params.context);
+    applyDetailsExtras(page, item, isLiquidGlass() ? logoImageUrl(item, apiClient, {}) : null);
     renderTrackSelections(page, instance, item);
 
     renderSeriesTimerEditor(page, item, apiClient, user);

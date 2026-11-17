@@ -1,14 +1,15 @@
-// details — Item details page: full-bleed backdrop, title block, glass action cluster, cast/seasons.
+// details — Item details page, tv.apple.com movie layout: full-bleed hero backdrop with the title block
+// bottom-left and credits bottom-right, aligned content below, round cast, and an About/Information section.
 // Owned by task T5. Glass only on the functional layer; use the mixins, never hand-written blur.
 @use 'mixins' as *;
 @use 'badges' as *;
 
-$details-backdrop-height: 70vh;
-$details-ribbon-height: 12em;
-$details-title-offset: 32.45vw; // stock left inset that clears the poster on desktop
+// Desktop breakpoint (matches the stock librarybrowser 62.5em split) and the wide-desktop credits split
+$details-desktop-query: '(min-width: 62.5em)';
+$details-wide-query: '(min-width: 75em)';
 
 // ---------------------------------------------------------------------------
-// Motion: artwork settles in, title block and actions rise in on a 40 ms stagger.
+// Motion: artwork settles in, title block and actions rise in on a stagger.
 // Reduced motion falls back to opacity only.
 // ---------------------------------------------------------------------------
 @keyframes lg-details-rise {
@@ -46,14 +47,17 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 }
 
 // ---------------------------------------------------------------------------
-// Full-bleed backdrop with readability gradients into --lg-bg
+// Backdrop: full-bleed 16:9 hero on desktop (readability gradients into --lg-bg), 16:9 header on mobile
 // ---------------------------------------------------------------------------
 .itemDetailPage {
     overflow-x: clip; // the 1.04 settle scale must not create a horizontal scrollbar
 }
 
+.layout-desktop .itemDetailPage {
+    --lg-details-hero-h: min(56.25vw, calc(100vh - 3rem));
+}
+
 .itemDetailPage .itemBackdrop {
-    height: $details-backdrop-height;
     background-attachment: scroll; // fixed attachment fights the transform animation
     transform-origin: center top;
     animation: lg-details-backdrop var(--lg-dur-artwork) var(--lg-ease-out) both;
@@ -76,69 +80,85 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 }
 
 .layout-mobile .itemDetailPage .itemBackdrop {
-    height: 50vh;
+    height: 56.25vw;
+    min-height: 14rem;
     background-position: top center;
 }
 
+// Desktop (any width where the layout class is set, so tablets too): hero, title block and gutter rules
+.layout-desktop .itemDetailPage .itemBackdrop {
+    height: 7rem;
+}
+
+.layout-desktop .itemDetailPage.lg-details-banner .itemBackdrop {
+    height: var(--lg-details-hero-h);
+    min-height: 28rem;
+    background-size: cover;
+    background-position: center 25%;
+
+    &::after {
+        background-image:
+            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.8) 12%, rgba(var(--lg-bg-rgb), 0.25) 32%, transparent 50%),
+            linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.7) 0%, rgba(var(--lg-bg-rgb), 0.3) 28%, transparent 50%),
+            linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.45) 0%, transparent 16%);
+
+        [dir='rtl'] & {
+            background-image:
+                linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.8) 12%, rgba(var(--lg-bg-rgb), 0.25) 32%, transparent 50%),
+                linear-gradient(to left, rgba(var(--lg-bg-rgb), 0.7) 0%, rgba(var(--lg-bg-rgb), 0.3) 28%, transparent 50%),
+                linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.45) 0%, transparent 16%);
+        }
+    }
+}
+
+// Stock poster and logo are replaced by the hero, the title block and the credits
+.layout-desktop .itemDetailPage .detailImageContainer,
+.layout-desktop .itemDetailPage .detailLogo {
+    display: none !important;
+}
+
+// Containers share the page colour so the hero fades straight into the content
+.layout-desktop .itemDetailPage .detailPageWrapperContainer,
+.layout-desktop .itemDetailPage .detailPagePrimaryContainer {
+    background-color: transparent;
+}
+
 // ---------------------------------------------------------------------------
-// Ribbon: no opaque bar; the gradients do the job. Stock .layout-tv rule (background: none) still applies.
+// Ribbon: the title block sits on the hero bottom-left, one gutter from the edge. No opaque bar.
 // ---------------------------------------------------------------------------
 .detailRibbon {
     background: none;
 }
 
-// Desktop: the ribbon sits beside the floated poster (25vw). Stack it as a column (info, then actions)
-// and start its content at the same 32.45vw edge as the logo and the sections below.
-.layout-desktop .itemDetailPage .detailRibbon {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    height: auto;
-    min-height: $details-ribbon-height;
-    margin-top: -$details-ribbon-height;
+// Title logo (when the item has one). Shown on desktop at any width; hidden on mobile and TV, where the text title shows.
+.lg-details-heading {
+    margin-bottom: var(--lg-space-1);
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 0ms backwards;
+}
 
-    [dir='ltr'] & {
-        padding-left: calc(#{$details-title-offset} - 25vw);
-    }
+.lg-details-logo {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(28rem, 34vw);
+    max-height: 8.5rem;
+    object-fit: contain;
+    object-position: left bottom;
+    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.45));
 
     [dir='rtl'] & {
-        padding-right: calc(#{$details-title-offset} - 25vw);
-    }
-
-    .infoWrapper {
-        flex: 0 0 auto;
-        width: 100%;
+        object-position: right bottom;
     }
 }
 
-// Seamless fade: containers share the backdrop gradient's end colour (also under .noBackdropTransparency)
-.itemDetailPage .detailPagePrimaryContainer,
-.noBackdropTransparency .itemDetailPage .detailPagePrimaryContainer {
-    background-color: var(--lg-bg);
+.layout-mobile .lg-details-heading,
+.layout-tv .lg-details-heading {
+    display: none;
 }
 
 // ---------------------------------------------------------------------------
 // Title block
 // ---------------------------------------------------------------------------
-.itemDetailPage .detailLogo {
-    top: calc(#{$details-backdrop-height} - #{$details-ribbon-height} - 18vh - 0.75rem);
-    width: min(32vw, 28rem);
-    height: 18vh;
-    background-position: left bottom;
-    animation: lg-details-fade var(--lg-dur-page) var(--lg-ease-out) backwards;
-
-    [dir='ltr'] & {
-        left: $details-title-offset;
-        right: auto;
-    }
-
-    [dir='rtl'] & {
-        right: $details-title-offset;
-        left: auto;
-        background-position: right bottom;
-    }
-}
-
 .itemDetailPage .itemName {
     font-family: var(--lg-font-display);
     font-size: var(--lg-type-display);
@@ -191,6 +211,47 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
     }
 }
 
+// Hero summary: genre line and a three-line overview, ~36rem wide
+.lg-details-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lg-space-2);
+    max-width: min(36rem, 100%);
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 60ms backwards;
+}
+
+@media #{$details-desktop-query} {
+    .layout-desktop .itemDetailPage .lg-details-summary {
+        max-width: min(36rem, 46vw);
+    }
+}
+
+.lg-details-genres {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    color: var(--lg-text);
+    font-size: var(--lg-type-callout);
+    font-weight: 600;
+
+    span + span::before {
+        content: '\00b7';
+        margin-inline: 0.45em;
+    }
+}
+
+.lg-details-overview {
+    margin: 0;
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-callout);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+
 .itemDetailPage .itemGenres,
 .itemDetailPage .tagline {
     color: var(--lg-text-secondary);
@@ -209,6 +270,12 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
     line-height: 1.5;
     color: var(--lg-text);
     letter-spacing: var(--lg-track-body);
+}
+
+// The tagline and overview appear in the hero summary and the About card instead
+.itemDetailPage .detailSectionContent .tagline,
+.itemDetailPage .detailSectionContent .overview {
+    display: none;
 }
 
 // Official rating: outlined badge (not a filled pill), with a small gap from the item before it
@@ -233,6 +300,51 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
     color: var(--lg-text-secondary);
 }
 
+// Credits: Starring / Director, right-aligned on wide desktops, inline below
+.lg-details-credits {
+    margin: 0;
+    display: grid;
+    gap: 0.3rem;
+    font-size: var(--lg-type-footnote);
+    line-height: 1.35;
+    animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 160ms backwards;
+
+    > div {
+        display: block;
+    }
+
+    dt {
+        display: inline;
+        color: var(--lg-text-secondary);
+        margin-inline-end: 0.35em;
+    }
+
+    dd {
+        display: inline;
+        margin: 0;
+        color: var(--lg-text);
+    }
+}
+
+.lg-details-credits__link {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+        text-decoration: underline;
+    }
+}
+
+@media #{$details-wide-query} {
+    .layout-desktop .itemDetailPage .lg-details-credits {
+        position: absolute;
+        inset-inline-end: var(--lg-gutter);
+        bottom: 0.5rem;
+        max-width: 22rem;
+    }
+}
+
 // Entry stagger (backwards fill: no residual transform once finished)
 .itemDetailPage .nameContainer {
     animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) backwards;
@@ -245,6 +357,7 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 .itemDetailPage .mainDetailButtons {
     flex-wrap: wrap;
     gap: var(--lg-space-3);
+    margin-top: var(--lg-space-1);
     animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 80ms backwards;
 }
 
@@ -252,14 +365,87 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
     animation: lg-details-rise var(--lg-dur-page) var(--lg-ease-out) 120ms backwards;
 }
 
+// Phone: poster removed; title, info, summary, buttons and credits all start on one gutter
+.layout-mobile .itemDetailPage .detailImageContainer {
+    display: none !important;
+}
+
+.layout-mobile .itemDetailPage .detailRibbon {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--lg-space-3);
+    padding-inline: var(--lg-gutter) !important;
+    text-align: start;
+}
+
+.layout-mobile .itemDetailPage .infoWrapper {
+    box-sizing: border-box;
+    width: 100%;
+    padding-inline-start: 0 !important;
+}
+
+.layout-mobile .itemDetailPage .nameContainer,
+.layout-mobile .itemDetailPage .itemName {
+    text-align: start;
+}
+
+.layout-mobile .itemDetailPage .itemMiscInfo {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    text-align: start;
+}
+
+.layout-mobile .itemDetailPage .mainDetailButtons {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+// Desktop ribbon: title block bottom-left on the hero, one gutter from the edge (after the phone rules it refines)
+.layout-desktop .itemDetailPage .detailRibbon {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--lg-space-3);
+    height: auto;
+    min-height: 0;
+    margin-top: 0;
+    padding-inline: var(--lg-gutter) !important; // overrides the stock 32.45vw inset in both directions
+}
+
+.layout-desktop .itemDetailPage.lg-details-banner .detailRibbon {
+    margin-top: calc(-0.42 * var(--lg-details-hero-h));
+}
+
+.layout-desktop .itemDetailPage .detailRibbon .infoWrapper {
+    flex: 0 0 auto;
+    width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .itemDetailPage .itemBackdrop,
     .itemDetailPage .nameContainer,
     .itemDetailPage .itemMiscInfo-primary,
+    .lg-details-heading,
+    .lg-details-summary,
     .itemDetailPage .mainDetailButtons,
+    .lg-details-credits,
     .itemDetailPage .detailPagePrimaryContent {
         animation-name: lg-details-fade;
     }
+}
+
+.layout-desktop .itemDetailPage:has(.lg-details-logo) .nameContainer .itemName:not(.parentName):not(.originalTitle) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +486,7 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 
     .layout-mobile & {
         flex: 1 1 100%;
-        max-width: 20rem;
+        max-width: none;
         justify-content: center;
 
         &::after {
@@ -326,10 +512,6 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
             letter-spacing: var(--lg-track-body);
         }
     }
-}
-
-.layout-mobile .itemDetailPage .mainDetailButtons {
-    justify-content: center;
 }
 
 // TV: no transforms on focus beyond the ring
@@ -359,7 +541,10 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 }
 
 .itemDetailPage .detailVerticalSection .sectionTitle {
+    font-size: var(--lg-type-title2);
+    font-weight: 700;
     margin-bottom: var(--lg-space-3);
+    padding-inline-start: 0;
 }
 
 .itemDetailPage .detailPageSecondaryContainer,
@@ -371,6 +556,68 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
 .layout-mobile .itemDetailPage .detailPageContent,
 .layout-mobile .itemDetailPage .detailPagePrimaryContent {
     padding-inline: var(--lg-gutter) !important;
+}
+
+.layout-tv .itemDetailPage .detailPageContent {
+    padding-inline: var(--lg-gutter) !important;
+}
+
+// Desktop and TV gutter: title block, sections and info grid share one left edge
+.layout-desktop .itemDetailPage .detailPagePrimaryContent {
+    padding-inline: var(--lg-gutter) !important;
+    padding-top: var(--lg-space-5);
+}
+
+.layout-desktop .itemDetailPage .detailPageContent {
+    padding-inline: var(--lg-gutter) !important;
+}
+
+// Desktop: title block, sections and the info grid share one left edge (the gutter)
+@media #{$details-desktop-query} {
+    // Two columns: content on the left, details group on the right. Anything else spans the full row.
+    .layout-desktop .itemDetailPage .detailSection {
+        display: grid;
+        grid-template-columns: minmax(0, 40rem) minmax(0, 1fr);
+        column-gap: var(--lg-space-6);
+        row-gap: var(--lg-space-3);
+        align-items: start;
+    }
+
+    .layout-desktop .itemDetailPage .detailSection > * {
+        grid-column: 1 / -1;
+    }
+
+    .layout-desktop .itemDetailPage .detailSection > .trackSelections,
+    .layout-desktop .itemDetailPage .detailSection > .detailSectionContent {
+        grid-column: 1;
+    }
+
+    .layout-desktop .itemDetailPage .detailSection > .itemDetailsGroup {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+    }
+}
+
+// Track selection rows: label column + control column
+.itemDetailPage .trackSelectionFieldContainer {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--lg-space-3);
+
+    .selectLabel {
+        color: var(--lg-text-secondary);
+        font-size: var(--lg-type-footnote);
+    }
+}
+
+// Details group rows (Genres / Directors / Writers / Studios): label column + value column
+.itemDetailPage .itemDetailsGroup .detailsGroupItem {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    column-gap: var(--lg-space-3);
+    padding-block: 0.3rem;
+    font-size: var(--lg-type-footnote);
 }
 
 .itemDetailPage .itemDetailsGroup .label {
@@ -398,17 +645,159 @@ $details-title-offset: 32.45vw; // stock left inset that clears the poster on de
     line-height: 1.4;
 }
 
-// When the logo is shown (desktop widths, where stock displays it) it is the title: keep the text title
-// in the accessibility tree but visually hidden. Browsers without :has() keep both.
-@media (min-width: 68.8em) {
-    .layout-desktop .itemDetailPage:has(.detailLogo:not(.hide)) .nameContainer .itemName:not(.parentName):not(.originalTitle) {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        margin: -1px;
-        padding: 0;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
+// ---------------------------------------------------------------------------
+// Cast: round photos, centred names
+// ---------------------------------------------------------------------------
+.itemDetailPage #castContent .card.personCard {
+    width: 8.75rem;
+
+    .cardPadder {
+        padding-bottom: 100% !important;
     }
+
+    .cardScalable,
+    .cardImageContainer,
+    .cardPadder,
+    .blurhash-canvas,
+    .cardContent {
+        border-radius: 50%;
+    }
+
+    .cardBox {
+        box-shadow: none;
+        background: none;
+    }
+
+    .cardText {
+        text-align: center;
+    }
+
+    .cardText:first-child {
+        font-size: var(--lg-type-footnote);
+        font-weight: 600;
+    }
+
+    .cardText-secondary {
+        font-size: 0.75rem;
+        color: var(--lg-text-secondary);
+    }
+}
+
+.layout-tv .itemDetailPage #castContent .card.personCard {
+    width: 11rem;
+}
+
+.layout-mobile .itemDetailPage #castContent .card.personCard {
+    width: 6.5rem;
+}
+
+// ---------------------------------------------------------------------------
+// About: cards (overview, ratings) and an information grid (Information / Languages / Accessibility)
+// ---------------------------------------------------------------------------
+.lg-details-about__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: var(--lg-space-4);
+    max-width: 62rem;
+    margin-bottom: var(--lg-space-6);
+}
+
+.lg-details-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lg-space-1);
+    padding: var(--lg-space-4) var(--lg-space-5);
+    border-radius: var(--lg-radius-md);
+    background: var(--lg-bg-elevated);
+}
+
+.lg-details-card__title {
+    margin: 0;
+    font-size: var(--lg-type-headline);
+    font-weight: 700;
+    color: var(--lg-text);
+}
+
+.lg-details-card__eyebrow {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lg-text-secondary);
+}
+
+// No clamp: the About card carries the full overview (the stock overview is hidden)
+.lg-details-card__text {
+    margin: var(--lg-space-1) 0 0;
+    font-size: var(--lg-type-callout);
+    line-height: 1.45;
+    color: var(--lg-text-secondary);
+    display: block;
+    overflow: visible;
+}
+
+.lg-details-card__row {
+    display: flex;
+    align-items: center;
+    gap: var(--lg-space-2);
+}
+
+.lg-details-info {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--lg-space-5);
+}
+
+@media (max-width: 62.5em) {
+    .lg-details-info {
+        grid-template-columns: 1fr;
+    }
+}
+
+.lg-details-info__title {
+    margin: 0 0 var(--lg-space-3);
+    font-size: var(--lg-type-headline);
+    font-weight: 700;
+    color: var(--lg-text);
+}
+
+.lg-details-info dl {
+    margin: 0;
+    display: grid;
+    gap: var(--lg-space-3);
+}
+
+.lg-details-info dt {
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    color: var(--lg-text);
+}
+
+.lg-details-info dd {
+    margin: 0.15rem 0 0;
+    font-size: var(--lg-type-footnote);
+    line-height: 1.45;
+    color: var(--lg-text-secondary);
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    overflow: hidden;
+}
+
+// Metadata links read as text, as on tv.apple.com: values in primary white, tags quieter in secondary.
+// (_base.scss paints every .button-link blue with !important, so these need it too.)
+.itemDetailPage .itemTags,
+.itemDetailPage .itemTags a.button-link {
+    color: var(--lg-text-secondary) !important;
+}
+
+.itemDetailPage .itemExternalLinks a.button-link {
+    color: var(--lg-text) !important;
+}
+
+.itemDetailPage .itemDetailsGroup .content a.button-link {
+    color: var(--lg-text) !important;
 }
