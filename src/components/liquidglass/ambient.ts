@@ -30,6 +30,28 @@ const GAMMA_OFFSET = 0.055;
 const GAMMA_SCALE = 1.055;
 const GAMMA_EXPONENT = 2.4;
 const MAX_CHANNEL = 255;
+/** Session key holding the last shown artwork, so a refresh off home keeps the backdrop. */
+const STORAGE_KEY = 'lg-ambient-url';
+const TV_LAYOUT_CLASS = 'layout-tv';
+/** Routes where the full-screen blur is not shown. */
+const EXCLUDED_ROUTE_PREFIXES = [
+    '/dashboard',
+    '/configurationpage',
+    '/video',
+    '/login',
+    '/selectserver',
+    '/addserver',
+    '/forgotpassword',
+    '/wizard'
+];
+/** Sign-in and setup routes: the stored artwork is dropped so it never shows to another user. */
+const AUTH_ROUTE_PREFIXES = [
+    '/login',
+    '/selectserver',
+    '/addserver',
+    '/forgotpassword',
+    '/wizard'
+];
 
 let initialised = false;
 let root: HTMLElement | undefined;
@@ -41,6 +63,7 @@ let debounceTimer: number | undefined;
 /** Bumped to discard image loads that a newer change has superseded. */
 let loadToken = 0;
 let taintReported = false;
+let storageReported = false;
 
 /** Mean red, green and blue of RGBA pixel data, each rounded to an integer. */
 export function averageRgb(data: Uint8ClampedArray): [number, number, number] {
@@ -94,13 +117,65 @@ export function scrimAlphaFor(rgb: readonly [number, number, number]): number {
     return Math.round(alpha * SCRIM_DECIMALS) / SCRIM_DECIMALS;
 }
 
-function isHomeRoute(): boolean {
-    const hash = window.location.hash;
-    return hash === '' || hash.startsWith('#/home');
+/** Hash route without the leading "#" or "#!", and without the query string. */
+function currentRoutePath(): string {
+    const hash = window.location.hash.replace(/^#!?/, '');
+    const queryStart = hash.indexOf('?');
+    const path = queryStart === -1 ? hash : hash.slice(0, queryStart);
+    return path.toLowerCase();
 }
 
-function syncRouteVisibility(): void {
-    if (root) root.hidden = !isHomeRoute();
+/** Segment-aware prefix match: "/video" matches "/video" and "/video/1", not "/videos". */
+function matchesPrefix(path: string, prefix: string): boolean {
+    if (prefix === '/forgotpassword' || prefix === '/wizard') return path.startsWith(prefix);
+    return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function isHomeRoute(): boolean {
+    const path = currentRoutePath();
+    return path === '' || path === '/' || path === '/home' || path.startsWith('/home');
+}
+
+function isAmbientRoute(): boolean {
+    if (document.documentElement.classList.contains(TV_LAYOUT_CLASS)) return isHomeRoute();
+    const path = currentRoutePath();
+    return !EXCLUDED_ROUTE_PREFIXES.some(prefix => matchesPrefix(path, prefix));
+}
+
+function isAuthRoute(): boolean {
+    const path = currentRoutePath();
+    return AUTH_ROUTE_PREFIXES.some(prefix => matchesPrefix(path, prefix));
+}
+
+function reportStorageUnavailable(error: unknown): void {
+    if (storageReported) return;
+    storageReported = true;
+    console.debug('[ambient] session storage unavailable', error);
+}
+
+function readStored(): string | null {
+    try {
+        return sessionStorage.getItem(STORAGE_KEY);
+    } catch (error) {
+        reportStorageUnavailable(error);
+        return null;
+    }
+}
+
+function writeStored(url: string): void {
+    try {
+        sessionStorage.setItem(STORAGE_KEY, url);
+    } catch (error) {
+        reportStorageUnavailable(error);
+    }
+}
+
+function removeStored(): void {
+    try {
+        sessionStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+        reportStorageUnavailable(error);
+    }
 }
 
 function createLayer(): HTMLElement {
@@ -176,6 +251,7 @@ function escapeCssUrl(url: string): string {
 }
 
 function showLoaded(url: string, image: HTMLImageElement, index: number): void {
+    if (isAuthRoute()) return;
     const pair = ensureLayers();
     pair.forEach((layer, i) => {
         layer.classList.toggle(VISIBLE_CLASS, i === index);
@@ -184,13 +260,15 @@ function showLoaded(url: string, image: HTMLImageElement, index: number): void {
     activeIndex = index;
     shownUrl = url;
     applyColour(image);
+    writeStored(url);
 }
 
 function show(url: string): void {
+    // Create layers first: creating them re-runs route visibility, which may restore a stored url
+    ensureLayers();
     if (url === requestedUrl) return;
     requestedUrl = url;
     const token = ++loadToken;
-    ensureLayers();
     // Load into the hidden layer; it becomes visible only once the image has arrived
     const hiddenIndex = activeIndex === 0 ? 1 : 0;
 
@@ -205,6 +283,45 @@ function show(url: string): void {
     image.src = url;
 }
 
+/** Shows the artwork for the current route's stored url, if any, without waiting for the debounce. */
+function restoreStored(): void {
+    if (!isLiquidGlass() || requestedUrl !== undefined || !isAmbientRoute()) return;
+    const stored = readStored();
+    if (stored) show(stored);
+}
+
+/** On sign-in routes, drops the stored url and all artwork so it never shows to another user. Returns true when it purged. */
+function purgeForAuthRoute(): boolean {
+    if (!isAuthRoute()) return false;
+    removeStored();
+    cancelPending();
+    fadeOut();
+    for (const layer of layers ?? []) {
+        layer.style.backgroundImage = '';
+    }
+    return true;
+}
+
+function syncRouteVisibility(): void {
+    if (root) root.hidden = !isAmbientRoute();
+    if (purgeForAuthRoute()) return;
+    restoreStored();
+}
+
+/** Shows the artwork for a url once the debounce has settled. Empty urls keep the current artwork. */
+export function setAmbientBackdrop(url: string | undefined): void {
+    if (!isLiquidGlass()) return;
+    if (!url) return;
+    if (isAuthRoute()) return;
+
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => {
+        debounceTimer = undefined;
+        if (isAuthRoute()) return;
+        show(url);
+    }, DEBOUNCE_MS);
+}
+
 function onHeroChange(event: Event): void {
     if (!isLiquidGlass()) return;
 
@@ -212,15 +329,10 @@ function onHeroChange(event: Event): void {
     const url = detail?.backdropUrl;
     if (!url) {
         cancelPending();
-        fadeOut();
         return;
     }
 
-    window.clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(() => {
-        debounceTimer = undefined;
-        show(url);
-    }, DEBOUNCE_MS);
+    setAmbientBackdrop(url);
 }
 
 function teardown(): void {
@@ -235,7 +347,13 @@ function teardown(): void {
 }
 
 function onThemeChange(): void {
-    if (!isLiquidGlass()) teardown();
+    if (!isLiquidGlass()) {
+        teardown();
+        return;
+    }
+    // The theme loads after initAmbient runs, so a stored backdrop is restored here
+    if (purgeForAuthRoute()) return;
+    restoreStored();
 }
 
 /** Start following hero backdrops while Liquid Glass is active. Safe to call more than once. */
@@ -245,4 +363,7 @@ export function initAmbient(): void {
     document.addEventListener(HERO_CHANGE_EVENT, onHeroChange);
     window.addEventListener('hashchange', syncRouteVisibility);
     Events.on(document, EventType.THEME_CHANGE, onThemeChange);
+    // A cold load on a sign-in route must not keep a stored backdrop
+    // The theme is often applied before this runs (its change event already fired), so restore here too
+    if (!purgeForAuthRoute()) restoreStored();
 }

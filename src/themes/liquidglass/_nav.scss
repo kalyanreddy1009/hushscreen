@@ -119,6 +119,40 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         }
     }
 
+    // Phones: the bar is about 320px wide, too narrow for the logo, menu, back button, title and five actions.
+    // Buttons never shrink (no overlap), the title truncates, and wherever a back button shows it takes the
+    // leading spot: the logo and menu step aside (the tab bar's Home tab and the home page still offer both).
+    .layout-mobile & {
+        .headerTop button,
+        .lg-wordmark {
+            flex-shrink: 0;
+        }
+
+        .headerRight > button {
+            margin-right: 0;
+            margin-left: 0;
+        }
+
+        .headerLeft {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .pageTitle {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .layout-mobile &:has(.headerBackButton:not(.hide)) {
+        .lg-wordmark,
+        .mainDrawerButton {
+            display: none !important;
+        }
+    }
+
     .lg-wordmark__mark {
         width: 32px;
         height: 32px;

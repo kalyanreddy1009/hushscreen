@@ -4,7 +4,7 @@ import { EventType } from '../../constants/eventType';
 import Events from '../../utils/events';
 import { LIQUID_GLASS_THEME_ID, THEME_ID_ATTRIBUTE } from '../../themes/liquidglass/isLiquidGlass';
 
-import { averageRgb, initAmbient, scrimAlphaFor } from './ambient';
+import { averageRgb, initAmbient, scrimAlphaFor, setAmbientBackdrop } from './ambient';
 
 const HERO_EVENT = 'lg:herochange';
 const URL_A = 'https://server/Items/a/Images/Backdrop/0';
@@ -72,6 +72,7 @@ describe('ambient background', () => {
         vi.useFakeTimers();
         vi.stubGlobal('Image', FakeImage);
         FakeImage.instances.length = 0;
+        sessionStorage.clear();
         stubCanvas([ 100, 50, 0, 255, 200, 150, 100, 255 ]);
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         vi.spyOn(console, 'debug').mockImplementation(() => undefined);
@@ -88,6 +89,7 @@ describe('ambient background', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.unstubAllGlobals();
+        document.documentElement.classList.remove('layout-tv');
     });
 
     it('creates the layer as the first child of body and shows a layer after the image loads', () => {
@@ -136,43 +138,177 @@ describe('ambient background', () => {
         expect(visibleLayers()).toEqual(shown);
     });
 
-    it('hides the layer and resets the colour on a null detail', () => {
+    it('keeps the visible layer and colour on a null detail', () => {
         backdrop(URL_A);
         requestedImage(URL_A).onload?.();
+        const shown = visibleLayers();
         expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('90, 60, 30');
 
         heroChange(null);
 
-        expect(visibleLayers()).toHaveLength(0);
-        expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('');
-        expect(document.documentElement.style.getPropertyValue('--lg-ambient-scrim')).toBe('');
+        expect(visibleLayers()).toEqual(shown);
+        expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('90, 60, 30');
+        expect(document.documentElement.style.getPropertyValue('--lg-ambient-scrim')).not.toBe('');
     });
 
-    it('hides the layer instead of requesting "undefined" when the detail has no backdrop', () => {
+    it('keeps the previous backdrop instead of requesting "undefined" when the detail has no backdrop', () => {
         backdrop(URL_A);
         requestedImage(URL_A).onload?.();
-        expect(visibleLayers()).toHaveLength(1);
+        const shown = visibleLayers();
+        expect(shown).toHaveLength(1);
 
         heroChange({ itemId: 'x', backdropUrl: undefined });
         vi.advanceTimersByTime(150);
 
         expect(FakeImage.instances.some(image => image.src === 'undefined')).toBe(false);
-        expect(visibleLayers()).toHaveLength(0);
-        expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('');
+        expect(visibleLayers()).toEqual(shown);
+        expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('90, 60, 30');
     });
 
-    it('hides the layer when the route leaves home and shows it again on return', () => {
+    it('keeps the ambient visible on non-home routes except the excluded ones', () => {
         backdrop(URL_A);
         requestedImage(URL_A).onload?.();
         const ambient = document.querySelector<HTMLElement>('.lg-ambient');
 
         window.location.hash = '#/details?id=1';
         window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(false);
+
+        window.location.hash = '#/dashboard/users';
+        window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(true);
+
+        window.location.hash = '#/video';
+        window.dispatchEvent(new Event('hashchange'));
         expect(ambient?.hidden).toBe(true);
 
         window.location.hash = '#/home';
         window.dispatchEvent(new Event('hashchange'));
         expect(ambient?.hidden).toBe(false);
+    });
+
+    it('hides the ambient on TV layouts outside home', () => {
+        document.documentElement.classList.add('layout-tv');
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+        const ambient = document.querySelector<HTMLElement>('.lg-ambient');
+
+        window.location.hash = '#/movies';
+        window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(true);
+
+        window.location.hash = '#/home';
+        window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(false);
+    });
+
+    it('removes the visible layers and the stored url on sign-in routes', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+        expect(sessionStorage.getItem('lg-ambient-url')).toBe(URL_A);
+
+        window.location.hash = '#/login';
+        window.dispatchEvent(new Event('hashchange'));
+
+        expect(document.querySelector<HTMLElement>('.lg-ambient')?.hidden).toBe(true);
+        expect(visibleLayers()).toHaveLength(0);
+        expect(sessionStorage.getItem('lg-ambient-url')).toBeNull();
+    });
+
+    it('stores the shown url in sessionStorage once it loads', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+
+        expect(sessionStorage.getItem('lg-ambient-url')).toBe(URL_A);
+    });
+
+    it('shows a backdrop passed to setAmbientBackdrop after the debounce', () => {
+        setAmbientBackdrop(URL_B);
+        expect(FakeImage.instances).toHaveLength(0);
+
+        vi.advanceTimersByTime(150);
+
+        expect(FakeImage.instances.map(image => image.src)).toEqual([ URL_B ]);
+    });
+
+    it('keeps the visible layer and requests nothing for an undefined url to setAmbientBackdrop', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+        const shown = visibleLayers();
+
+        setAmbientBackdrop(undefined);
+        vi.advanceTimersByTime(150);
+
+        expect(FakeImage.instances.map(image => image.src)).toEqual([ URL_A ]);
+        expect(visibleLayers()).toEqual(shown);
+    });
+
+    it('restores the stored url on a visible route after a hashchange', () => {
+        sessionStorage.setItem('lg-ambient-url', URL_A);
+        window.location.hash = '#/details?id=1';
+
+        window.dispatchEvent(new Event('hashchange'));
+        requestedImage(URL_A).onload?.();
+
+        expect(FakeImage.instances.map(image => image.src)).toContain(URL_A);
+        expect(visibleLayers()).toHaveLength(1);
+    });
+
+    it('purges the stored url and artwork when the theme loads on a sign-in route', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+        window.location.hash = '#/login';
+        sessionStorage.setItem('lg-ambient-url', URL_A);
+
+        Events.trigger(document, EventType.THEME_CHANGE);
+
+        expect(sessionStorage.getItem('lg-ambient-url')).toBeNull();
+        expect(FakeImage.instances.filter(image => image.src === URL_A)).toHaveLength(1);
+        expect(visibleLayers()).toHaveLength(0);
+    });
+
+    it('ignores a backdrop set while on a sign-in route', () => {
+        window.location.hash = '#/login';
+
+        setAmbientBackdrop(URL_A);
+        vi.advanceTimersByTime(150);
+
+        expect(FakeImage.instances).toHaveLength(0);
+    });
+
+    it('discards a load that completes after navigating to a sign-in route', () => {
+        backdrop(URL_A);
+        window.location.hash = '#/login';
+        window.dispatchEvent(new Event('hashchange'));
+
+        requestedImage(URL_A).onload?.();
+
+        expect(visibleLayers()).toHaveLength(0);
+        expect(sessionStorage.getItem('lg-ambient-url')).toBeNull();
+    });
+
+    it('treats mixed-case excluded routes as excluded', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+        const ambient = document.querySelector<HTMLElement>('.lg-ambient');
+
+        window.location.hash = '#/Dashboard/users';
+        window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(true);
+
+        window.location.hash = '#/VIDEO';
+        window.dispatchEvent(new Event('hashchange'));
+        expect(ambient?.hidden).toBe(true);
+    });
+
+    it('does not treat a route that only shares a prefix as excluded', () => {
+        backdrop(URL_A);
+        requestedImage(URL_A).onload?.();
+
+        window.location.hash = '#/videos';
+        window.dispatchEvent(new Event('hashchange'));
+
+        expect(document.querySelector<HTMLElement>('.lg-ambient')?.hidden).toBe(false);
     });
 
     it('does nothing outside the Liquid Glass theme', () => {
@@ -253,5 +389,43 @@ describe('averageRgb', () => {
 
     it('returns black for empty pixel data', () => {
         expect(averageRgb(new Uint8ClampedArray([]))).toEqual([ 0, 0, 0 ]);
+    });
+});
+
+describe('initAmbient on a cold load', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubGlobal('Image', FakeImage);
+        FakeImage.instances.length = 0;
+        sessionStorage.clear();
+        // The theme is already applied before the module starts, as on a page refresh
+        document.documentElement.setAttribute(THEME_ID_ATTRIBUTE, LIQUID_GLASS_THEME_ID);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        document.querySelector('.lg-ambient')?.remove();
+        sessionStorage.clear();
+    });
+
+    it('restores the stored backdrop when it starts off home', async () => {
+        sessionStorage.setItem('lg-ambient-url', URL_A);
+        window.location.hash = '#/movies';
+        const fresh = await import('./ambient');
+
+        fresh.initAmbient();
+
+        expect(FakeImage.instances.map(image => image.src)).toEqual([ URL_A ]);
+    });
+
+    it('drops the stored backdrop when it starts on the sign-in page', async () => {
+        sessionStorage.setItem('lg-ambient-url', URL_A);
+        window.location.hash = '#/login';
+        const fresh = await import('./ambient');
+
+        fresh.initAmbient();
+
+        expect(FakeImage.instances).toHaveLength(0);
+        expect(sessionStorage.getItem('lg-ambient-url')).toBeNull();
     });
 });

@@ -39,6 +39,8 @@ import Dashboard from 'utils/dashboard';
 import Events from 'utils/events';
 import { getItemBackdropImageUrl } from 'utils/jellyfin-apiclient/backdropImage';
 import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
+import { setAmbientBackdrop } from 'components/liquidglass/ambient';
+import { getBackdropUrl } from 'components/homesections/hero/hero';
 
 import 'elements/emby-itemscontainer/emby-itemscontainer';
 import 'elements/emby-checkbox/emby-checkbox';
@@ -512,6 +514,7 @@ function setTrailerButtonVisibility(page, item) {
 }
 
 function renderBackdrop(page, item, apiClient) {
+    if (isLiquidGlass()) setAmbientBackdrop(getBackdropUrl(apiClient, item));
     if (isLiquidGlass() && !layoutManager.mobile) {
         const hasBanner = renderHeaderBackdrop(page, item, apiClient);
         page.classList.toggle('lg-details-banner', hasBanner);

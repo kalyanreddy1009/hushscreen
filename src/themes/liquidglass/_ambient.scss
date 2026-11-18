@@ -96,32 +96,107 @@ $frosted: 'html:not(.layout-tv):has(> body > .lg-ambient:not([hidden]) > .lg-amb
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 28px rgba(0, 0, 0, 0.18);
 }
 
-// Home cards: glass frames around each card, on phone and desktop whether or not the backdrop has loaded,
-// so card geometry never shifts when it arrives. No per-card blur: the backdrop behind is already blurred.
+// The page content layer (not dialogs, menus or the drawer, which live outside .mainAnimatedPage).
+// The admin dashboard (.type-interior pages, and the class its layout sets) and the sign-in and setup pages
+// (.standalonePage) keep their plain surfaces: the backdrop never shows there (ambient.ts).
+$page: 'body:not(.dashboardDocument) .mainAnimatedPage:not(.standalonePage):not(.type-interior)';
+$glass-frame-fill: rgba(255, 255, 255, 0.08);
+$glass-frame-edge: rgba(255, 255, 255, 0.18);
+$glass-frame-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 30px rgba(0, 0, 0, 0.16);
+$settings-link: '.userPreferencesPage .verticalSection > a.listItem-border';
+
+// Cards on every page: glass frames around each card, on phone and desktop whether or not the backdrop has
+// loaded, so card geometry never shifts when it arrives. No per-card blur: the backdrop behind is already
+// blurred. Cards with their own footer box (.visualCardBox, _cards.scss) keep it.
 // !important beats the stock `.cardBox { padding: 0 !important }` in src/components/cardbuilder/card.scss.
-html:not(.layout-tv) .homeSectionsContainer .card .cardBox {
+html:not(.layout-tv) #{$page} .card .cardBox:not(.visualCardBox) {
     padding: 8px 8px 4px !important;
     border-radius: var(--lg-radius-lg);
-    background-color: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 30px rgba(0, 0, 0, 0.16);
+    background-color: $glass-frame-fill;
+    border: 1px solid $glass-frame-edge;
+    box-shadow: $glass-frame-shadow;
 }
 
-html:not(.layout-tv) .homeSectionsContainer .card .cardScalable {
+html:not(.layout-tv) #{$page} .card .cardBox:not(.visualCardBox) .cardScalable {
     border-radius: var(--lg-radius-md);
     overflow: hidden;
 }
 
+// Page surfaces turn to glass over the backdrop. Text steps up: over the scrimmed backdrop (luminance <= 0.09,
+// ambient.ts) plus a 0.08 white fill, white at 64% only reaches ~3.6:1, while 82% gives ~4.7:1. Tertiary text
+// also lands on glass fills (cards, tiles, settings panels), so it takes the same 82%.
+#{$frosted} #{$page} {
+    --lg-bg-elevated: #{$glass-frame-fill};
+    --lg-surface-2: #{$glass-frame-fill};
+    --lg-surface-3: rgba(255, 255, 255, 0.14);
+    --lg-fill-input: rgba(255, 255, 255, 0.1);
+    --lg-separator: rgba(255, 255, 255, 0.16);
+    --lg-text-secondary: rgba(255, 255, 255, 0.82);
+    --lg-text-tertiary: rgba(255, 255, 255, 0.82);
+}
+
+// Native option lists cannot show the backdrop; keep them solid so white option text stays readable
+#{$frosted} #{$page} select > option {
+    background: var(--lg-glass-solid);
+}
+
 // Glass tile rows on home
 #{$frosted} .lg-tile {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.18);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 30px rgba(0, 0, 0, 0.16);
+    background-color: $glass-frame-fill;
+    border-color: $glass-frame-edge;
+    box-shadow: $glass-frame-shadow;
 }
 
 // Card text sits on the frames, so it gets a faint shadow to hold over bright artwork
-#{$frosted} .homeSectionsContainer .cardText {
+#{$frosted} #{$page} .cardText {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+// Details: the area under the hero lets the backdrop through, and the About cards match the card frames
+#{$frosted} .itemDetailPage .detailPageSecondaryContainer {
+    background-color: transparent;
+}
+
+// Geometry (borders, radius, padding) is unconditional so nothing moves when the backdrop arrives;
+// only the colours wait for it
+.lg-details-card {
+    border: 1px solid transparent;
+    border-radius: var(--lg-radius-lg);
+}
+
+#{$frosted} .lg-details-card {
+    border-color: $glass-frame-edge;
+    box-shadow: $glass-frame-shadow;
+}
+
+// Settings menu: each section's links become one grouped glass panel
+#{$settings-link} {
+    border-right: 1px solid transparent;
+    border-left: 1px solid transparent;
+
+    .listItem {
+        padding-right: var(--lg-space-4);
+        padding-left: var(--lg-space-4);
+    }
+}
+
+.userPreferencesPage .verticalSection > .sectionTitle + a.listItem-border {
+    border-top: 1px solid transparent;
+    border-radius: var(--lg-radius-lg) var(--lg-radius-lg) 0 0;
+}
+
+#{$settings-link}:last-child {
+    border-radius: 0 0 var(--lg-radius-lg) var(--lg-radius-lg);
+}
+
+#{$frosted} #{$settings-link} {
+    background-color: $glass-frame-fill;
+    border-right-color: rgba(255, 255, 255, 0.14);
+    border-left-color: rgba(255, 255, 255, 0.14);
+}
+
+#{$frosted} .userPreferencesPage .verticalSection > .sectionTitle + a.listItem-border {
+    border-top-color: $glass-frame-edge;
 }
 
 // Reduced transparency and increased contrast: back to the solid glass and the header's own shadow
@@ -133,8 +208,16 @@ html:not(.layout-tv) .homeSectionsContainer .card .cardScalable {
         --lg-glass-frosted-fill: var(--lg-glass-solid);
     }
 
-    html:not(.layout-tv) .homeSectionsContainer .card .cardBox,
-    #{$frosted} .lg-tile {
+    #{$frosted} #{$page} {
+        --lg-bg-elevated: var(--lg-glass-solid);
+        --lg-surface-2: var(--lg-glass-solid);
+        --lg-surface-3: #3a3a3c;
+        --lg-fill-input: var(--lg-glass-solid);
+    }
+
+    html:not(.layout-tv) #{$page} .card .cardBox:not(.visualCardBox),
+    #{$frosted} .lg-tile,
+    #{$frosted} #{$settings-link} {
         background-color: var(--lg-glass-solid);
     }
 }
@@ -147,11 +230,27 @@ html:not(.layout-tv) .homeSectionsContainer .card .cardScalable {
         --lg-glass-edge: rgba(255, 255, 255, 0.6);
     }
 
-    html:not(.layout-tv) .homeSectionsContainer .card .cardBox,
-    #{$frosted} .lg-tile {
+    #{$frosted} #{$page} {
+        --lg-bg-elevated: #141414;
+        --lg-surface-2: #141414;
+        --lg-surface-3: #262626;
+        --lg-fill-input: #141414;
+        --lg-separator: rgba(255, 255, 255, 0.6);
+        --lg-text-secondary: rgba(255, 255, 255, 0.92);
+        --lg-text-tertiary: rgba(255, 255, 255, 0.86);
+    }
+
+    html:not(.layout-tv) #{$page} .card .cardBox:not(.visualCardBox),
+    #{$frosted} .lg-tile,
+    #{$frosted} .lg-details-card,
+    #{$frosted} #{$settings-link} {
         background-color: #141414;
         border-color: rgba(255, 255, 255, 0.6);
         box-shadow: none;
+    }
+
+    #{$frosted} .itemDetailPage .detailPageSecondaryContainer {
+        background-color: var(--lg-bg);
     }
 }
 
