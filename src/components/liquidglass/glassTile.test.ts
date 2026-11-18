@@ -161,6 +161,17 @@ describe('renderGlassTiles', () => {
 
         expect(container.querySelector('.lg-tile__play')?.getAttribute('aria-label')).toBe('Play Blade Runner');
     });
+
+    it('renders a hidden placeholder carrying the escaped title before the image', () => {
+        const container = mount(renderGlassTiles([ movie({ Name: '<i>Dune</i>' }) ], { shape: 'landscape' }));
+        const placeholder = container.querySelector<HTMLElement>('.lg-tile__placeholder') as HTMLElement;
+        const img = container.querySelector<HTMLImageElement>('img.lg-tile__image') as HTMLImageElement;
+
+        expect(placeholder.textContent).toBe('<i>Dune</i>');
+        expect(placeholder.getAttribute('aria-hidden')).toBe('true');
+        expect(container.querySelector('.lg-tile__placeholder i')).toBeNull();
+        expect(placeholder.compareDocumentPosition(img) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
 });
 
 describe('bindGlassTiles', () => {
@@ -303,5 +314,134 @@ describe('bindGlassTiles', () => {
 
         expect(updateFavoriteStatus).not.toHaveBeenCalled();
         expect(play).not.toHaveBeenCalled();
+    });
+
+    function tileImage(root: HTMLElement): HTMLImageElement {
+        return root.querySelector<HTMLImageElement>('img.lg-tile__image') as HTMLImageElement;
+    }
+
+    function setImageState(img: HTMLImageElement, complete: boolean, naturalWidth: number): void {
+        Object.defineProperty(img, 'complete', { configurable: true, value: complete });
+        Object.defineProperty(img, 'naturalWidth', { configurable: true, value: naturalWidth });
+    }
+
+    // Mirrors the production order: the list binds first, then innerHTML lands on the same container.
+    function bindThenRender(): { root: HTMLDivElement; unbind: () => void } {
+        const root = mount('');
+        const unbind = bindGlassTiles(root, apiClient as never);
+        root.innerHTML = renderGlassTiles([ movie() ], { shape: 'landscape' });
+        return { root, unbind };
+    }
+
+    it('adds is-loaded when an image fires load after bind-then-render', () => {
+        const { root, unbind } = bindThenRender();
+        const img = tileImage(root);
+
+        expect(img.classList.contains('is-loaded')).toBe(false);
+        img.dispatchEvent(new Event('load'));
+
+        expect(img.classList.contains('is-loaded')).toBe(true);
+        expect(img.classList.contains('is-failed')).toBe(false);
+        unbind();
+    });
+
+    it('adds is-failed and keeps the placeholder when an image fires error after bind-then-render', () => {
+        const { root, unbind } = bindThenRender();
+        const img = tileImage(root);
+
+        img.dispatchEvent(new Event('error'));
+
+        expect(img.classList.contains('is-failed')).toBe(true);
+        expect(img.classList.contains('is-loaded')).toBe(false);
+        expect(root.querySelector('.lg-tile__placeholder')).not.toBeNull();
+        unbind();
+    });
+
+    it('ignores load events from images outside the tile image class', () => {
+        const { root, unbind } = bindThenRender();
+        const other = document.createElement('img');
+        root.appendChild(other);
+
+        other.dispatchEvent(new Event('load'));
+
+        expect(other.classList.contains('is-loaded')).toBe(false);
+        unbind();
+    });
+
+    it('stops reacting to load events after unbind', () => {
+        const { root, unbind } = bindThenRender();
+        const img = tileImage(root);
+        unbind();
+
+        img.dispatchEvent(new Event('load'));
+        img.dispatchEvent(new Event('error'));
+
+        expect(img.classList.contains('is-loaded')).toBe(false);
+        expect(img.classList.contains('is-failed')).toBe(false);
+    });
+
+    describe('cached images (rAF scan)', () => {
+        beforeEach(() => {
+            vi.useFakeTimers({ toFake: [ 'requestAnimationFrame', 'cancelAnimationFrame' ] });
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('marks an image already complete with a width as loaded after the frame', () => {
+            const root = mount('');
+            const unbind = bindGlassTiles(root, apiClient as never);
+            root.innerHTML = renderGlassTiles([ movie() ], { shape: 'landscape' });
+            const img = tileImage(root);
+            setImageState(img, true, 640);
+
+            vi.advanceTimersByTime(20);
+
+            expect(img.classList.contains('is-loaded')).toBe(true);
+            expect(img.classList.contains('is-failed')).toBe(false);
+            unbind();
+        });
+
+        it('marks an image complete with zero width as failed after the frame', () => {
+            const root = mount('');
+            const unbind = bindGlassTiles(root, apiClient as never);
+            root.innerHTML = renderGlassTiles([ movie() ], { shape: 'landscape' });
+            const img = tileImage(root);
+            setImageState(img, true, 0);
+
+            vi.advanceTimersByTime(20);
+
+            expect(img.classList.contains('is-failed')).toBe(true);
+            expect(img.classList.contains('is-loaded')).toBe(false);
+            unbind();
+        });
+
+        it('leaves an image that is still loading untouched by the frame scan', () => {
+            const root = mount('');
+            const unbind = bindGlassTiles(root, apiClient as never);
+            root.innerHTML = renderGlassTiles([ movie() ], { shape: 'landscape' });
+            const img = tileImage(root);
+            setImageState(img, false, 0);
+
+            vi.advanceTimersByTime(20);
+
+            expect(img.classList.contains('is-loaded')).toBe(false);
+            expect(img.classList.contains('is-failed')).toBe(false);
+            unbind();
+        });
+
+        it('cancels the pending frame on unbind', () => {
+            const root = mount('');
+            const unbind = bindGlassTiles(root, apiClient as never);
+            root.innerHTML = renderGlassTiles([ movie() ], { shape: 'landscape' });
+            const img = tileImage(root);
+            setImageState(img, true, 640);
+            unbind();
+
+            vi.advanceTimersByTime(20);
+
+            expect(img.classList.contains('is-loaded')).toBe(false);
+        });
     });
 });

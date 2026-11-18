@@ -148,12 +148,12 @@ $stagger-count: 12;
 
     // Copy on the incoming slide rises in, line by line
     .lg-hero:not(.lg-hero--pending) .lg-hero__slide.is-active .lg-hero__content > * {
-        animation: lg-rise 640ms var(--lg-ease-out) backwards;
+        animation: lg-rise 480ms var(--lg-ease-out) backwards;
     }
 
     @for $i from 1 through 6 {
         .lg-hero:not(.lg-hero--pending) .lg-hero__slide.is-active .lg-hero__content > :nth-child(#{$i}) {
-            animation-delay: #{120ms + 70ms * ($i - 1)};
+            animation-delay: #{40ms + 35ms * ($i - 1)};
         }
     }
 

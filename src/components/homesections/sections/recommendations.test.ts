@@ -748,6 +748,17 @@ describe('loadRecommendationRows on Liquid Glass', () => {
         expect(secondUnbind).not.toHaveBeenCalled();
     });
 
+    it('renders no row or section for a recommendation category with zero items', async () => {
+        const api = fakeApiClient({ highly: () => queryResult([]) });
+
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+
+        const headings = Array.from(container.querySelectorAll('.lg-rec-section h2')).map(h => h.textContent);
+        expect(headings).not.toContain('Highly Rated, Not Yet Watched');
+        expect(rowFor('Highly Rated, Not Yet Watched')).toBeUndefined();
+        expect(container.querySelectorAll('.lg-rec-section')).toHaveLength(4);
+    });
+
     it('keeps the card path and never binds tiles on a stock theme', async () => {
         document.documentElement.removeAttribute('data-jf-theme');
         const api = fakeApiClient();

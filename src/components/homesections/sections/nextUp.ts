@@ -108,7 +108,10 @@ export function loadNextUp(
     itemsContainer.fetchData = getNextUpFetchFn(apiClient.serverId(), userSettings, options);
     if (isLiquidGlass()) {
         itemsContainer.classList.add('lg-tiles-row');
-        itemsContainer.getItemsHtml = items => renderGlassRow(itemsContainer, apiClient, items, 'landscape');
+        itemsContainer.getItemsHtml = items => {
+            elem.classList.toggle('hide', items.length === 0);
+            return renderGlassRow(itemsContainer, apiClient, items, 'landscape');
+        };
     } else {
         itemsContainer.getItemsHtml = getNextUpItemsHtmlFn(userSettings.useEpisodeImagesInNextUpAndResume(), options);
     }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Events from '../../utils/events';
 import { EventType } from '../../constants/eventType';
@@ -6,7 +6,7 @@ import { buildTargets, FALLBACK_TARGETS, getActiveTab, initBottomTabBar, renderT
 
 const apiMock = vi.hoisted(() => ({
     layout: { tv: false, mobile: true },
-    userId: 'user-1',
+    userId: 'user-1' as string | null,
     views: [] as { Id: string, CollectionType: string }[],
     getUserViews: vi.fn()
 }));
@@ -252,5 +252,100 @@ describe('initBottomTabBar', () => {
         expect(document.querySelector('[data-tab="shows"]')?.getAttribute('href')).toBe('#/home');
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
+    });
+
+    it('does not fetch or warn before a user is signed in, and links Movies and Shows to Home', async () => {
+        apiMock.userId = null;
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        initBottomTabBar(options);
+        await flushPromises();
+
+        expect(apiMock.getUserViews).not.toHaveBeenCalled();
+        expect(document.querySelector('[data-tab="movies"]')?.getAttribute('href')).toBe('#/home');
+        expect(document.querySelector('[data-tab="shows"]')?.getAttribute('href')).toBe('#/home');
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it('loads the libraries on the next navigation once the user is signed in', async () => {
+        apiMock.userId = null;
+        initBottomTabBar(options);
+        await flushPromises();
+
+        apiMock.userId = 'user-late';
+        apiMock.views = [ { Id: 'm1', CollectionType: 'movies' } ];
+        document.dispatchEvent(new Event('viewshow'));
+        await flushPromises();
+
+        expect(apiMock.getUserViews).toHaveBeenCalledTimes(1);
+        expect(document.querySelector('[data-tab="movies"]')?.getAttribute('href')).toBe('#/movies?topParentId=m1&collectionType=movies');
+    });
+
+    it('does not refetch the views on a navigation for the same user', async () => {
+        apiMock.userId = 'user-nav';
+        apiMock.views = [ { Id: 'm1', CollectionType: 'movies' } ];
+        initBottomTabBar(options);
+        await flushPromises();
+        document.dispatchEvent(new Event('viewshow'));
+        await flushPromises();
+
+        expect(apiMock.getUserViews).toHaveBeenCalledTimes(1);
+    });
+
+    describe('failed loads', () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('skips the retry and the warning for a navigation within 30 seconds of a failure', async () => {
+            apiMock.userId = 'user-throttle';
+            apiMock.getUserViews.mockRejectedValue(new Error('server down'));
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+            initBottomTabBar(options);
+            await flushPromises();
+
+            document.dispatchEvent(new Event('viewshow'));
+            await flushPromises();
+            document.dispatchEvent(new Event('viewshow'));
+            await flushPromises();
+
+            expect(apiMock.getUserViews).toHaveBeenCalledTimes(1);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(document.querySelector('[data-tab="movies"]')?.getAttribute('href')).toBe('#/home');
+            warn.mockRestore();
+        });
+
+        it('retries after 30 seconds and still warns only once for the key', async () => {
+            vi.useFakeTimers({ toFake: [ 'Date' ] });
+            vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+            apiMock.userId = 'user-retry';
+            apiMock.getUserViews.mockRejectedValue(new Error('server down'));
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+            initBottomTabBar(options);
+            await flushPromises();
+
+            vi.setSystemTime(new Date('2026-01-01T00:00:30Z'));
+            document.dispatchEvent(new Event('viewshow'));
+            await flushPromises();
+
+            expect(apiMock.getUserViews).toHaveBeenCalledTimes(2);
+            expect(warn).toHaveBeenCalledTimes(1);
+            warn.mockRestore();
+        });
+    });
+
+    it('refetches the views when the user changes', async () => {
+        apiMock.userId = 'user-first';
+        apiMock.views = [ { Id: 'm1', CollectionType: 'movies' } ];
+        initBottomTabBar(options);
+        await flushPromises();
+
+        apiMock.userId = 'user-second';
+        apiMock.views = [ { Id: 'm2', CollectionType: 'movies' } ];
+        document.dispatchEvent(new Event('viewshow'));
+        await flushPromises();
+
+        expect(apiMock.getUserViews).toHaveBeenCalledTimes(2);
+        expect(document.querySelector('[data-tab="movies"]')?.getAttribute('href')).toBe('#/movies?topParentId=m2&collectionType=movies');
     });
 });

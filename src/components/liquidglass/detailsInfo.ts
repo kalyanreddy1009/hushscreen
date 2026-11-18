@@ -19,6 +19,10 @@ const AD_DESCRIPTION_PATTERN = /audio description|descriptive audio|described vi
 const AD_ABBREVIATION_PATTERN = /\bAD\b/;
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
 const EXTRAS_SELECTOR = '.lg-details-heading, .lg-details-summary, .lg-details-credits, .lg-details-about';
+const AUDIO_JUNK_PATTERN = /^(ISO Media file produced by [^-]*[^-\s]|Lavf[\d.]*|SoundHandler|Core Media Audio)\s*-\s*/i;
+const TAGS_CLAMP_CLASS = 'lg-tags--clamped';
+const TAGS_MORE_CLASS = 'lg-tags__more';
+const HIDE_CLASS = 'hide';
 
 const TYPE_LABEL_KEYS = new Map<string, string>([
     [ 'Movie', 'Movie' ],
@@ -275,6 +279,141 @@ export function renderAboutHtml(item: BaseItemDto): string {
     return `<div class="lg-details-about verticalSection detailVerticalSection"><h2 class="sectionTitle sectionTitle-cards">${escapeHtml(globalize.translate('LiquidGlassAbout'))}</h2>${cardsHtml}${infoHtml}</div>`;
 }
 
+/** Audio track label prefixes written by encoders and players, e.g. "ISO Media file produced by Google Inc. - AAC". */
+function cleanAudioOptions(select: HTMLSelectElement): void {
+    for (const option of select.querySelectorAll('option')) {
+        const label = option.textContent ?? '';
+        const cleaned = label.replace(AUDIO_JUNK_PATTERN, '');
+        if (cleaned !== label) option.textContent = cleaned;
+    }
+}
+
+let tagsIdCounter = 0;
+
+function expandTags(tags: HTMLElement, moreButton: HTMLElement): void {
+    moreButton.setAttribute('aria-expanded', 'true');
+    tags.classList.remove(TAGS_CLAMP_CLASS);
+    moreButton.remove();
+    tags.focus();
+}
+
+/** Clamps the tag line to one line when it wraps, and adds a button that shows all of it. Safe to re-run. */
+function syncTagsClamp(page: HTMLElement): void {
+    const tags = page.querySelector<HTMLElement>('.itemTags');
+    if (!tags) return;
+
+    const previousButton = tags.nextElementSibling;
+    if (previousButton?.classList.contains(TAGS_MORE_CLASS)) previousButton.remove();
+    tags.classList.remove(TAGS_CLAMP_CLASS);
+    tags.removeAttribute('tabindex');
+
+    // A hidden view measures 0. Never clamp then; the ResizeObserver re-runs this once the view has a size.
+    if (tags.clientHeight === 0) return;
+
+    tags.classList.add(TAGS_CLAMP_CLASS);
+    if (tags.scrollHeight <= tags.clientHeight) {
+        tags.classList.remove(TAGS_CLAMP_CLASS);
+        return;
+    }
+
+    if (!tags.id) tags.id = `lg-tags-${++tagsIdCounter}`;
+    const moreButton = document.createElement('button');
+    moreButton.type = 'button';
+    moreButton.className = TAGS_MORE_CLASS;
+    moreButton.textContent = globalize.translate('ShowMore');
+    moreButton.setAttribute('aria-expanded', 'false');
+    moreButton.setAttribute('aria-controls', tags.id);
+    moreButton.addEventListener('click', () => expandTags(tags, moreButton));
+
+    // The button sits after the clamped line, so the line-clamp cannot hide it
+    tags.tabIndex = -1;
+    tags.insertAdjacentElement('afterend', moreButton);
+}
+
+/** Measures after the view has laid out, so a view still being shown is not measured at 0. */
+function scheduleTagsClamp(page: HTMLElement): void {
+    requestAnimationFrame(() => syncTagsClamp(page));
+}
+
+/** Re-syncs the clamp only when the tag line changes width. The clamp changes height, so height changes would loop. */
+function observeTagsWidth(tags: HTMLElement, sync: () => void): ResizeObserver {
+    let lastWidth = -1;
+    const observer = new ResizeObserver(entries => {
+        const width = entries[0]?.contentRect.width ?? 0;
+        if (width === lastWidth) return;
+        lastWidth = width;
+        sync();
+    });
+    observer.observe(tags);
+    return observer;
+}
+
+/** The play-from-beginning button shares the Resume state: only label it while it is shown. */
+function syncPlayFromBeginningLabel(replayButton: HTMLElement): void {
+    if (replayButton.classList.contains(HIDE_CLASS)) return;
+
+    const label = globalize.translate('PlayFromBeginning');
+    replayButton.title = label;
+    replayButton.setAttribute('aria-label', label);
+}
+
+function observeChanges(target: Element, options: MutationObserverInit, sync: () => void): MutationObserver {
+    const observer = new MutationObserver(sync);
+    observer.observe(target, options);
+    return observer;
+}
+
+type DetailsObserver = MutationObserver | ResizeObserver;
+
+const detailsObservers = new WeakMap<HTMLElement, DetailsObserver[]>();
+const hookedPages = new WeakSet<HTMLElement>();
+
+function disconnectDetailsObservers(page: HTMLElement): void {
+    for (const observer of detailsObservers.get(page) ?? []) {
+        observer.disconnect();
+    }
+    detailsObservers.delete(page);
+}
+
+/**
+ * Keeps the audio labels, the play-from-beginning label and the tag clamp right while stock code repopulates or toggles them.
+ * Cached views are restored without applyDetailsExtras, so the viewshow listener below calls this again.
+ */
+function watchDetailsControls(page: HTMLElement): void {
+    disconnectDetailsObservers(page);
+    const observers: DetailsObserver[] = [];
+
+    const select = page.querySelector<HTMLSelectElement>('.selectAudio');
+    if (select) {
+        const syncAudio = () => cleanAudioOptions(select);
+        syncAudio();
+        observers.push(observeChanges(select, { childList: true }, syncAudio));
+    }
+
+    const replayButton = page.querySelector<HTMLElement>('.btnReplay');
+    if (replayButton) {
+        const syncReplay = () => syncPlayFromBeginningLabel(replayButton);
+        syncReplay();
+        observers.push(observeChanges(replayButton, { attributes: true, attributeFilter: [ 'class' ] }, syncReplay));
+    }
+
+    const tags = page.querySelector<HTMLElement>('.itemTags');
+    if (tags) {
+        scheduleTagsClamp(page);
+        if (typeof ResizeObserver !== 'undefined') {
+            observers.push(observeTagsWidth(tags, () => syncTagsClamp(page)));
+        }
+    }
+
+    detailsObservers.set(page, observers);
+
+    if (!hookedPages.has(page)) {
+        hookedPages.add(page);
+        page.addEventListener('viewbeforehide', () => disconnectDetailsObservers(page));
+        page.addEventListener('viewshow', () => watchDetailsControls(page));
+    }
+}
+
 /** Replaces the Liquid Glass details extras on the page. Stock theme gets no extras. */
 export function applyDetailsExtras(page: HTMLElement, item: BaseItemDto, logoUrl: string | null): void {
     for (const element of page.querySelectorAll(EXTRAS_SELECTOR)) {
@@ -282,6 +421,8 @@ export function applyDetailsExtras(page: HTMLElement, item: BaseItemDto, logoUrl
     }
 
     if (!isLiquidGlass()) return;
+
+    watchDetailsControls(page);
 
     const ribbon = page.querySelector('.detailRibbon');
     if (ribbon) {

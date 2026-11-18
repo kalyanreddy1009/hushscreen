@@ -156,8 +156,8 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
     }
 
     .lg-wordmark__mark {
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         display: inline-flex;
     }
 
@@ -307,14 +307,79 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
     }
 }
 
+// The tab bar carries Home, so the header's Home button is redundant
+.lg-has-tabbar .skinHeader .headerHomeButton {
+    display: none;
+}
+
+// Search page has its own search field: the header search pill and button would duplicate it
+html:has(#searchPage:not(.hide)) .skinHeader .lg-search-pill,
+html:has(#searchPage:not(.hide)) .skinHeader .headerSearchButton {
+    display: none !important;
+}
+
 // Overrides the stock opaque-header rule above on pages with transparent header over artwork
 .skinHeader.semiTransparent.lg-header-condensed {
     background-color: var(--lg-glass-clear-fill);
 }
 
-// The stock mobile headroom slides by its own height; add the inset so the capsule fully leaves
+// Pin and unpin use the glass easing; wins over the stock .headroom linear 200ms transition
+.skinHeader.headroom {
+    transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+// The stock headroom slides by its own height; add the inset so the capsule fully leaves
 .headroom--unpinned.skinHeader {
     transform: translateY(calc(-100% - #{$lg-header-inset} - env(safe-area-inset-top)));
+}
+
+// Dashboard pages keep the header pinned
+.headroomDisabled.headroom--unpinned.skinHeader {
+    transform: none;
+}
+
+// Keyboard focus inside an unpinned header brings it back (it must not stay focusable off-screen)
+.skinHeader.headroom--unpinned:focus-within {
+    transform: none;
+}
+
+// Reduced motion: no slide, the header fades out and back instead
+@media (prefers-reduced-motion: reduce) {
+    .skinHeader.headroom {
+        transition: opacity 160ms linear;
+    }
+
+    .headroom--unpinned.skinHeader {
+        opacity: 0;
+        pointer-events: none;
+        transform: none;
+    }
+
+    .headroomDisabled.headroom--unpinned.skinHeader,
+    .skinHeader.headroom--unpinned:focus-within {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+// Video OSD header never takes the unpinned state; the player's hidden state still wins (it is declared last)
+.skinHeader.osdHeader.headroom--unpinned {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+// Repeats _player.scss .osdHeader-hidden (opacity 0, translateY by $lg-osd-shift = 8px). Its reduced-motion
+// transform: none is repeated too, because this selector is more specific than the player's rule.
+.skinHeader.osdHeader.osdHeader-hidden {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skinHeader.osdHeader.osdHeader-hidden {
+        transform: none;
+    }
 }
 
 // Video OSD and TV keep their own header behaviour

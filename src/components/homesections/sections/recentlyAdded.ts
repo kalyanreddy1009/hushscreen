@@ -138,12 +138,15 @@ function renderLatestSection(
     itemsContainer.fetchData = getFetchLatestItemsFn(apiClient.serverId(), parent.Id, parent.CollectionType, options);
     if (isLiquidGlass()) {
         itemsContainer.classList.add('lg-tiles-row');
-        itemsContainer.getItemsHtml = items => renderGlassRow(
-            itemsContainer,
-            apiClient,
-            items,
-            getGlassShape(parent.Type, parent.CollectionType)
-        );
+        itemsContainer.getItemsHtml = items => {
+            elem.classList.toggle('hide', items.length === 0);
+            return renderGlassRow(
+                itemsContainer,
+                apiClient,
+                items,
+                getGlassShape(parent.Type, parent.CollectionType)
+            );
+        };
     } else {
         itemsContainer.getItemsHtml = getLatestItemsHtmlFn(parent.Type, parent.CollectionType, options);
     }

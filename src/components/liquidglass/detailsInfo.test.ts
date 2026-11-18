@@ -1,5 +1,5 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const liquidGlassState = vi.hoisted(() => ({ active: true }));
 
@@ -371,5 +371,199 @@ describe('applyDetailsExtras', () => {
 
         expect(page.querySelector('.lg-details-heading, .lg-details-summary, .lg-details-credits, .lg-details-about')).toBeNull();
         expect(page.querySelector('.detailRibbon')?.children).toHaveLength(2);
+    });
+});
+
+function nextTick(): Promise<void> {
+    return new Promise(resolve => {
+        setTimeout(resolve, 0);
+    });
+}
+
+function nextFrame(): Promise<void> {
+    return new Promise(resolve => {
+        requestAnimationFrame(() => resolve());
+    });
+}
+
+describe('audio track label cleanup', () => {
+    let page: HTMLElement;
+
+    function buildAudioPage(labels: string[]): HTMLElement {
+        const audioPage = document.createElement('div');
+        const options = labels.map(label => `<option>${label}</option>`).join('');
+        audioPage.innerHTML = `<select class="selectAudio">${options}</select>`;
+        return audioPage;
+    }
+
+    function optionTexts(): string[] {
+        return Array.from(page.querySelectorAll('.selectAudio option'), option => option.textContent ?? '');
+    }
+
+    beforeEach(() => {
+        liquidGlassState.active = true;
+    });
+
+    it.each([
+        [ 'ISO Media file produced by Google Inc. - AAC - Stereo', 'AAC - Stereo' ],
+        [ 'Lavf58.76.100 - AAC - Stereo', 'AAC - Stereo' ],
+        [ 'SoundHandler - Stereo', 'Stereo' ],
+        [ 'Core Media Audio - Dolby Digital - 5.1', 'Dolby Digital - 5.1' ]
+    ])('strips the encoder prefix from %p', (label, expected) => {
+        page = buildAudioPage([ label ]);
+
+        applyDetailsExtras(page, itemWith(), null);
+
+        expect(optionTexts()).toEqual([ expected ]);
+    });
+
+    it('leaves a clean track title unchanged', () => {
+        page = buildAudioPage([ 'English - AAC - Stereo' ]);
+
+        applyDetailsExtras(page, itemWith(), null);
+
+        expect(optionTexts()).toEqual([ 'English - AAC - Stereo' ]);
+    });
+
+    it('cleans options when stock code repopulates the select', async () => {
+        page = buildAudioPage([]);
+        applyDetailsExtras(page, itemWith(), null);
+
+        const select = page.querySelector('.selectAudio') as HTMLSelectElement;
+        select.innerHTML = '<option>ISO Media file produced by Google Inc. - AAC - Stereo</option>';
+        await nextTick();
+
+        expect(optionTexts()).toEqual([ 'AAC - Stereo' ]);
+    });
+
+    it('cleans options again when a cached view is shown and its select is repopulated', () => {
+        page = buildAudioPage([]);
+        applyDetailsExtras(page, itemWith(), null);
+        page.dispatchEvent(new Event('viewbeforehide'));
+
+        const select = page.querySelector('.selectAudio') as HTMLSelectElement;
+        select.innerHTML = '<option>ISO Media file produced by Google Inc. - AAC - Stereo</option>';
+        expect(optionTexts()).toEqual([ 'ISO Media file produced by Google Inc. - AAC - Stereo' ]);
+
+        page.dispatchEvent(new Event('viewshow'));
+
+        expect(optionTexts()).toEqual([ 'AAC - Stereo' ]);
+    });
+});
+
+describe('tag line clamp', () => {
+    let page: HTMLElement;
+
+    function buildTagsPage(scrollHeight: number, clientHeight: number): HTMLElement {
+        const tagsPage = document.createElement('div');
+        tagsPage.innerHTML = '<div class="itemTags"><a href="#">Tag one</a>, <a href="#">Tag two</a></div>';
+        const tags = tagsPage.querySelector('.itemTags') as HTMLElement;
+        Object.defineProperty(tags, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+        Object.defineProperty(tags, 'clientHeight', { configurable: true, get: () => clientHeight });
+        document.body.append(tagsPage);
+        return tagsPage;
+    }
+
+    beforeEach(() => {
+        liquidGlassState.active = true;
+    });
+
+    afterEach(() => {
+        page?.remove();
+    });
+
+    it('adds a show more button after a tag line that wraps', async () => {
+        page = buildTagsPage(40, 20);
+
+        applyDetailsExtras(page, itemWith(), null);
+        await nextFrame();
+
+        const tags = page.querySelector('.itemTags') as HTMLElement;
+        const moreButton = page.querySelector('.lg-tags__more') as HTMLButtonElement;
+        expect(tags.classList.contains('lg-tags--clamped')).toBe(true);
+        expect(moreButton.type).toBe('button');
+        expect(moreButton.textContent).toBe('ShowMore');
+        expect(tags.nextElementSibling).toBe(moreButton);
+    });
+
+    it('links the show more button to the tag line with aria attributes', async () => {
+        page = buildTagsPage(40, 20);
+
+        applyDetailsExtras(page, itemWith(), null);
+        await nextFrame();
+
+        const tags = page.querySelector('.itemTags') as HTMLElement;
+        const moreButton = page.querySelector('.lg-tags__more') as HTMLButtonElement;
+        expect(tags.id).not.toBe('');
+        expect(moreButton.getAttribute('aria-controls')).toBe(tags.id);
+        expect(moreButton.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('removes the clamp and the button when clicked, and moves focus to the tag line', async () => {
+        page = buildTagsPage(40, 20);
+        applyDetailsExtras(page, itemWith(), null);
+        await nextFrame();
+        const moreButton = page.querySelector('.lg-tags__more') as HTMLButtonElement;
+
+        moreButton.click();
+
+        const tags = page.querySelector('.itemTags') as HTMLElement;
+        expect(tags.classList.contains('lg-tags--clamped')).toBe(false);
+        expect(page.querySelector('.lg-tags__more')).toBeNull();
+        expect(document.activeElement).toBe(tags);
+    });
+
+    it('adds no button when the tag line fits on one line', async () => {
+        page = buildTagsPage(20, 20);
+
+        applyDetailsExtras(page, itemWith(), null);
+        await nextFrame();
+
+        const tags = page.querySelector('.itemTags') as HTMLElement;
+        expect(page.querySelector('.lg-tags__more')).toBeNull();
+        expect(tags.classList.contains('lg-tags--clamped')).toBe(false);
+    });
+
+    it('never clamps a tag line that has no height yet, such as a hidden view', async () => {
+        page = buildTagsPage(40, 0);
+
+        applyDetailsExtras(page, itemWith(), null);
+        await nextFrame();
+
+        const tags = page.querySelector('.itemTags') as HTMLElement;
+        expect(page.querySelector('.lg-tags__more')).toBeNull();
+        expect(tags.classList.contains('lg-tags--clamped')).toBe(false);
+    });
+});
+
+describe('play from beginning label', () => {
+    let page: HTMLElement;
+
+    beforeEach(() => {
+        liquidGlassState.active = true;
+        page = document.createElement('div');
+        page.innerHTML = `
+            <button class="btnPlay" title="ButtonResume"></button>
+            <button class="btnReplay hide" title="Play"></button>
+        `;
+    });
+
+    it('leaves the replay label alone while resume is not visible', () => {
+        applyDetailsExtras(page, itemWith(), null);
+
+        const replay = page.querySelector('.btnReplay') as HTMLElement;
+        expect(replay.title).toBe('Play');
+        expect(replay.getAttribute('aria-label')).toBeNull();
+    });
+
+    it('labels the replay button once resume becomes visible', async () => {
+        applyDetailsExtras(page, itemWith(), null);
+        const replay = page.querySelector('.btnReplay') as HTMLElement;
+
+        replay.classList.remove('hide');
+        await nextTick();
+
+        expect(replay.title).toBe('PlayFromBeginning');
+        expect(replay.getAttribute('aria-label')).toBe('PlayFromBeginning');
     });
 });

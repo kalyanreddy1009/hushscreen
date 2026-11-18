@@ -172,6 +172,10 @@ let removeListeners: (() => void) | undefined;
 let observedHeader: Element | undefined;
 let targets: TabTargets = FALLBACK_TARGETS;
 let cachedTargets: { key: string, promise: Promise<TabTargets> } | undefined;
+/** The last failed load. Its key is not retried until RETRY_DELAY_MS has passed. */
+let lastFailure: { key: string, failedAt: number } | undefined;
+let warnedKey: string | undefined;
+const RETRY_DELAY_MS = 30_000;
 
 // React renders .skinHeader after this module loads, so it is observed lazily on first sight
 function observeHeader(): void {
@@ -204,26 +208,44 @@ function applyTargets(nav: HTMLElement, resolved: TabTargets): void {
 
 type ApiClient = Awaited<ReturnType<typeof ServerConnections.getCurrentApiClientAsync>>;
 
-async function fetchTargets(apiClient: ApiClient): Promise<TabTargets> {
-    const result = await apiClient.getUserViews({}, apiClient.getCurrentUserId());
+async function fetchTargets(apiClient: ApiClient, userId: string): Promise<TabTargets> {
+    const result = await apiClient.getUserViews({}, userId);
     return buildTargets(result.Items ?? []);
 }
 
-/** Resolves the Movies/Shows targets once per server and user. A failed load is not cached. */
+/**
+ * Resolves the Movies/Shows targets once per server and user. The cache entry keeps the key it was
+ * resolved for, so a navigation under the same key reuses it. A failed load is not cached. Without a
+ * signed-in user nothing is fetched or cached, and the fallback targets are returned. A key that failed
+ * is retried only after RETRY_DELAY_MS, and warns once.
+ */
 async function loadTargets(): Promise<TabTargets> {
+    let key = '';
     try {
         const apiClient = await ServerConnections.getCurrentApiClientAsync();
-        const key = `${apiClient.serverId()}|${apiClient.getCurrentUserId()}`;
-        const entry = cachedTargets?.key === key ? cachedTargets : { key, promise: fetchTargets(apiClient) };
+        const userId = apiClient.getCurrentUserId();
+        if (!userId) return FALLBACK_TARGETS;
+
+        key = `${apiClient.serverId()}|${userId}`;
+        if (lastFailure?.key === key && Date.now() - lastFailure.failedAt < RETRY_DELAY_MS) return FALLBACK_TARGETS;
+
+        const entry = cachedTargets?.key === key ? cachedTargets : { key, promise: fetchTargets(apiClient, userId) };
         cachedTargets = entry;
-        return await entry.promise;
+        const resolved = await entry.promise;
+        lastFailure = undefined;
+        return resolved;
     } catch (error) {
         cachedTargets = undefined;
-        console.warn('[BottomTabBar] Could not load libraries; Movies and Shows link to Home.', error);
+        lastFailure = { key, failedAt: Date.now() };
+        if (warnedKey !== key) {
+            warnedKey = key;
+            console.warn('[BottomTabBar] Could not load libraries; Movies and Shows link to Home.', error);
+        }
         return FALLBACK_TARGETS;
     }
 }
 
+/** Re-resolves the targets. Cheap when the key is already resolved: loadTargets reuses the cache. */
 function refreshTargets(): void {
     const mounted = bar;
     if (!mounted) return;
@@ -257,7 +279,11 @@ function mount(): void {
     bar.addEventListener('click', onClick);
     document.body.append(bar);
 
-    const onNav = () => update();
+    // The user may sign in after mount, so each navigation re-checks the targets (cached once resolved)
+    const onNav = () => {
+        update();
+        refreshTargets();
+    };
     window.addEventListener('hashchange', onNav);
     document.addEventListener('viewshow', onNav, true);
     removeListeners = () => {

@@ -486,3 +486,99 @@ html[dir] .itemsContainer.scrollSlider > .card > .cardBox {
         transition-duration: var(--lg-dur-micro);
     }
 }
+
+// ---------------------------------------------------------------------------
+// 10. Library and search grids (non-TV): cards match the glass tiles in _tiles.scss
+// Radius: .lg-tile (--lg-radius-lg). Rim: the tile border colour (rgba 255,255,255,0.08) as an inset
+// 1px edge on .cardScalable::before; this overrides the 0.06 edge in section 2 for these grids only.
+// Text: .lg-tile__title and .lg-tile__desc sizes, weights and colours.
+// Hover (fine pointers): translateY(-2px) like .lg-tile:hover. This replaces the stock scale lift and
+// tilt in these grids only; keyboard focus lift (section 3) is unchanged.
+// Press: --lg-press-scale. Transform only; no opacity change (tiles do not change opacity).
+// No backdrop-filter on cards. Reduced motion: no hover transform, press scale is 1 via tokens.
+// Scoped to the grid so the TV layout, home rows and list views keep their rules.
+// ---------------------------------------------------------------------------
+html:not(.layout-tv) .itemsContainer.vertical-wrap > .card {
+    backdrop-filter: none;
+
+    .cardBox {
+        backdrop-filter: none;
+    }
+
+    .cardImageContainer,
+    .cardContent,
+    .cardPadder,
+    .blurhash-canvas,
+    .cardOverlayContainer {
+        border-radius: var(--lg-radius-lg);
+    }
+
+    // Footer cards: artwork rounds on top only, the footer closes the shape
+    .visualCardBox {
+        border-radius: var(--lg-radius-lg);
+
+        .cardScalable,
+        .cardImageContainer,
+        .cardContent,
+        .blurhash-canvas,
+        .cardOverlayContainer {
+            border-radius: var(--lg-radius-lg) var(--lg-radius-lg) 0 0;
+        }
+    }
+
+    // Chained like the keyboard focus rule in section 3, so the radius wins over show-focus (same specificity, later)
+    .cardBox:not(.visualCardBox) .cardScalable {
+        border-radius: var(--lg-radius-lg);
+    }
+
+    .cardScalable::before {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    @media (prefers-contrast: more) {
+        .cardScalable::before {
+            box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+        }
+    }
+
+    .cardText-first {
+        color: var(--lg-text);
+        font-size: var(--lg-type-body);
+        font-weight: 600;
+        letter-spacing: var(--lg-track-body);
+        line-height: 1.3;
+    }
+
+    .cardText-secondary {
+        color: var(--lg-text-secondary);
+        font-size: 0.8125rem;
+        font-weight: 400;
+        line-height: 1.4;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            .cardBox:not(.visualCardBox) .cardScalable,
+            .cardBox.visualCardBox {
+                transform: translateY(-2px);
+            }
+        }
+    }
+
+    &:active {
+        .cardBox:not(.visualCardBox) .cardScalable,
+        .cardBox.visualCardBox {
+            transform: scale(var(--lg-press-scale));
+            transition-duration: var(--lg-dur-micro);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &:hover {
+            .cardBox:not(.visualCardBox) .cardScalable,
+            .cardBox.visualCardBox {
+                transform: none;
+            }
+        }
+    }
+}

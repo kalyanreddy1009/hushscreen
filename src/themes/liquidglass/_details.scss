@@ -63,24 +63,28 @@ $details-wide-query: '(min-width: 75em)';
     --lg-details-hero-h: min(56.25vw, calc(100vh - 7rem));
 }
 
+// Seam: the banner and its trailer child dissolve to transparent at the bottom, so the warm page shows through
+// instead of a flat grey band. The mask replaces the old bottom gradient into --lg-bg, which painted neutral grey.
+$details-backdrop-seam: linear-gradient(to bottom, #000 0%, #000 55%, rgba(0, 0, 0, 0.6) 75%, transparent 100%);
+
 .itemDetailPage .itemBackdrop {
     background-attachment: scroll; // fixed attachment fights the transform animation
     transform-origin: center top;
     animation: lg-details-backdrop var(--lg-dur-artwork) var(--lg-ease-out) both;
+    mask-image: $details-backdrop-seam;
+    // Safari still needs the prefixed mask property
+    // stylelint-disable-next-line property-no-vendor-prefix
+    -webkit-mask-image: $details-backdrop-seam;
 
     &::after {
         content: '';
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background-image:
-            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 22%, transparent 60%),
-            linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
+        background-image: linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
 
         [dir='rtl'] & {
-            background-image:
-                linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 22%, transparent 60%),
-                linear-gradient(to left, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
+            background-image: linear-gradient(to left, rgba(var(--lg-bg-rgb), 0.92) 0%, rgba(var(--lg-bg-rgb), 0.55) 32%, transparent 68%);
         }
     }
 }
@@ -104,15 +108,14 @@ $details-wide-query: '(min-width: 75em)';
     background-size: cover;
     background-position: center 25%;
 
+    // The bottom fade is the mask above; only the side and top legibility gradients remain
     &::after {
         background-image:
-            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.8) 12%, rgba(var(--lg-bg-rgb), 0.25) 32%, transparent 50%),
             linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.7) 0%, rgba(var(--lg-bg-rgb), 0.3) 28%, transparent 50%),
             linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.45) 0%, transparent 16%);
 
         [dir='rtl'] & {
             background-image:
-                linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.8) 12%, rgba(var(--lg-bg-rgb), 0.25) 32%, transparent 50%),
                 linear-gradient(to left, rgba(var(--lg-bg-rgb), 0.7) 0%, rgba(var(--lg-bg-rgb), 0.3) 28%, transparent 50%),
                 linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.45) 0%, transparent 16%);
         }
@@ -341,6 +344,15 @@ $details-wide-query: '(min-width: 75em)';
         margin: 0;
         color: var(--lg-text);
     }
+}
+
+// Duplicates: genres and director already show in the hero summary and credits, so the details group rows hide them
+.itemDetailPage:has(.lg-details-genres) .itemDetailsGroup .genresGroup {
+    display: none;
+}
+
+.itemDetailPage:has(.lg-details-credits) .itemDetailsGroup .directorsGroup {
+    display: none;
 }
 
 .lg-details-credits__link {
@@ -829,4 +841,28 @@ $details-wide-query: '(min-width: 75em)';
 
 .itemDetailPage .itemDetailsGroup .content a.button-link {
     color: var(--lg-text) !important;
+}
+
+// Long tag lists: one line until the user asks for more (detailsInfo.ts clamps only when the list wraps)
+.lg-tags--clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.lg-tags__more {
+    @include hit-target;
+    @include focus-ring(var(--lg-radius-pill));
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--lg-space-2);
+    border: 0;
+    border-radius: var(--lg-radius-pill);
+    background: none;
+    color: var(--lg-text);
+    font-family: inherit;
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    cursor: pointer;
 }

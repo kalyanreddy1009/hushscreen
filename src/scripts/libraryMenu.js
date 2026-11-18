@@ -36,6 +36,7 @@ import { initCardTilt } from '../components/liquidglass/cardTilt';
 import { initTvCardTrailer } from '../components/liquidglass/tvCardTrailer';
 import { initAmbient } from '../components/liquidglass/ambient';
 import { initNewSince } from '../components/liquidglass/newSince';
+import { isLiquidGlass } from '../themes/liquidglass/isLiquidGlass';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -43,11 +44,15 @@ import 'material-design-icons-iconfont';
 import '../styles/scrollstyles.scss';
 import '../styles/flexstyles.scss';
 
+// Liquid Glass header: pin and unpin tolerances in px, and the scroll distance before it can unpin
+const LG_HEADROOM_OPTIONS = { tolerance: { up: 6, down: 10 }, offset: 96 };
+let headroomInitialised = false;
+
 function renderHeader() {
     let html = '';
     html += '<div class="flex align-items-center flex-grow headerTop">';
     // Glass theme only: shown by _nav.scss when the page has no title of its own (see setDefaultTitle)
-    html += '<a href="#/home" class="lg-wordmark" aria-label="' + escapeHtml(globalize.translate('LiquidGlassBrandHome')) + '"><span class="lg-wordmark__mark" aria-hidden="true">' + renderBrandMark({ size: 28, idPrefix: 'hs-hdr' }) + '</span><span class="lg-wordmark__text">HushScreen</span></a>';
+    html += '<a href="#/home" class="lg-wordmark" aria-label="' + escapeHtml(globalize.translate('LiquidGlassBrandHome')) + '"><span class="lg-wordmark__mark" aria-hidden="true">' + renderBrandMark({ size: 32, idPrefix: 'hs-hdr' }) + '</span><span class="lg-wordmark__text">HushScreen</span></a>';
     html += '<div class="headerLeft">';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerButtonLeft headerBackButton hide"><span class="material-icons ' + (browser.safari ? 'chevron_left' : 'arrow_back') + '" aria-hidden="true"></span></button>';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerHomeButton hide barsMenuButton headerButtonLeft"><span class="material-icons home" aria-hidden="true"></span></button>';
@@ -278,7 +283,11 @@ function bindMenuEvents() {
     headerAudioPlayerButton.addEventListener('click', showAudioPlayer);
     headerSyncButton.addEventListener('click', onSyncButtonClicked);
 
-    if (layoutManager.mobile) {
+    // Liquid Glass header hides on scroll down. The theme is read once at render, so a theme switch needs a reload
+    // to change the header behaviour.
+    if (!layoutManager.tv && isLiquidGlass()) {
+        initHeadRoom(skinHeader, LG_HEADROOM_OPTIONS);
+    } else if (layoutManager.mobile) {
         initHeadRoom(skinHeader);
     }
     Events.on(playbackManager, 'playbackstart', onPlaybackStart);
@@ -660,8 +669,11 @@ function updateBackButton(page) {
     }
 }
 
-function initHeadRoom(elem) {
-    const headroom = new Headroom(elem);
+function initHeadRoom(elem, options) {
+    if (headroomInitialised) return;
+    headroomInitialised = true;
+
+    const headroom = new Headroom(elem, options);
     headroom.init();
 }
 

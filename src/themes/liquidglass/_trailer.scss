@@ -50,9 +50,9 @@
 }
 
 // No mask and full opacity: the video replaces the still artwork rather than mixing with it (a mask or partial
-// opacity lets the still show through and reads as a double exposure). Edges blend through the host's own
-// gradient layers, which are ::after pseudo-elements painted above this layer (_details.scss, _hero.scss), so
-// the moving image dissolves into the page exactly as the still one does.
+// opacity lets the still show through and reads as a double exposure). Edges blend through the host: on
+// details the .itemBackdrop mask fades this layer with the artwork (_details.scss), and in the hero the card's
+// ::after gradients sit above it (_hero.scss), so the moving image dissolves into the page as the still one does.
 
 // Circular glass control, placed under the header. The 44px hit target holds a 36px glass disc.
 // The transition merges the press feedback from the mixin with the opacity fade so neither overrides the other.

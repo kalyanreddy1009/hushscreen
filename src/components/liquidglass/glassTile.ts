@@ -20,6 +20,10 @@ const PLAY_CLASS = 'lg-tile__play';
 const ICON_FILLED = 'favorite';
 const ICON_OUTLINE = 'favorite_border';
 const ICON_PLAY = 'play_arrow';
+const IMAGE_CLASS = 'lg-tile__image';
+const IMAGE_LOADED_CLASS = 'is-loaded';
+const IMAGE_FAILED_CLASS = 'is-failed';
+const PLACEHOLDER_CLASS = 'lg-tile__placeholder';
 
 interface ImageSource {
     url: string;
@@ -63,13 +67,14 @@ function getImage(item: BaseItemDto, shape: GlassTileShape): ImageSource | undef
 
 function renderImageHtml(item: BaseItemDto, shape: GlassTileShape): string {
     const image = getImage(item, shape);
+    const placeholder = `<span class="${PLACEHOLDER_CLASS}" aria-hidden="true">${attr(getTitleAndDescription(item).title)}</span>`;
     const chipGenre = item.Genres?.[0];
     const chip = chipGenre ? `<span class="lg-tile__chip">${attr(chipGenre)}</span>` : '';
-    const img = image ? `<img class="lg-tile__image" src="${attr(image.url)}" loading="lazy" alt="">` : '';
+    const img = image ? `<img class="${IMAGE_CLASS}" src="${attr(image.url)}" loading="lazy" alt="">` : '';
     const pressed = Boolean(item.UserData?.IsFavorite);
     const favorite = `<button type="button" class="${FAVORITE_CLASS}" aria-label="${attr(globalize.translate('Favorite'))}" aria-pressed="${pressed}" data-id="${attr(item.Id)}"><span class="material-icons lg-tile__icon" aria-hidden="true">${pressed ? ICON_FILLED : ICON_OUTLINE}</span></button>`;
 
-    return `<div class="lg-tile__media">${img}${chip}${favorite}</div>`;
+    return `<div class="lg-tile__media">${placeholder}${img}${chip}${favorite}</div>`;
 }
 
 /** Episodes show the series as title and the episode name as the description fallback. */
@@ -143,10 +148,45 @@ function playTile(button: HTMLButtonElement): void {
     });
 }
 
+function markImageLoaded(img: HTMLImageElement): void {
+    img.classList.add(IMAGE_LOADED_CLASS);
+}
+
+// A failed image keeps the title on a still fill: the shimmer would otherwise promise art that never comes.
+function markImageFailed(img: HTMLImageElement): void {
+    img.classList.add(IMAGE_FAILED_CLASS);
+}
+
+/** Delegated handler: image load/error events do not bubble, so the container listens in the capture phase. */
+function onTileImageEvent(event: Event): void {
+    if (!(event.target instanceof HTMLImageElement) || !event.target.classList.contains(IMAGE_CLASS)) return;
+
+    if (event.type === 'load') {
+        markImageLoaded(event.target);
+    } else {
+        markImageFailed(event.target);
+    }
+}
+
+/** Marks images that finished loading before their listener existed (cached), skipping ones already marked. */
+function markCompleteImages(container: HTMLElement): void {
+    container.querySelectorAll<HTMLImageElement>(`img.${IMAGE_CLASS}`).forEach(img => {
+        const hasState = img.classList.contains(IMAGE_LOADED_CLASS) || img.classList.contains(IMAGE_FAILED_CLASS);
+        if (!img.complete || hasState) return;
+
+        if (img.naturalWidth > 0) {
+            markImageLoaded(img);
+        } else {
+            markImageFailed(img);
+        }
+    });
+}
+
 /**
  * Wires click handling for tiles rendered inside the container.
  * Heart and play clicks stop propagation so the tile body (item navigation) does not also fire.
- * Returns a function that removes the listener.
+ * Also fades in tile images as they load.
+ * Returns a function that removes the listeners.
  */
 export function bindGlassTiles(container: HTMLElement, apiClient: ApiClient): () => void {
     const onClick = (event: Event): void => {
@@ -180,8 +220,15 @@ export function bindGlassTiles(container: HTMLElement, apiClient: ApiClient): ()
     // Capture phase so this runs before the item-navigation listener on the same container (bubble phase).
     container.addEventListener('click', onClick, true);
     container.addEventListener('keydown', onKeyDown);
+    container.addEventListener('load', onTileImageEvent, true);
+    container.addEventListener('error', onTileImageEvent, true);
+    // Runs after the caller's synchronous innerHTML assignment, so cached images in the new markup are seen
+    const frame = requestAnimationFrame(() => markCompleteImages(container));
     return () => {
         container.removeEventListener('click', onClick, true);
         container.removeEventListener('keydown', onKeyDown);
+        container.removeEventListener('load', onTileImageEvent, true);
+        container.removeEventListener('error', onTileImageEvent, true);
+        cancelAnimationFrame(frame);
     };
 }
