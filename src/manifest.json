@@ -1,8 +1,8 @@
 {
-    "name": "Jellyfin",
-    "description": "The Free Software Media System",
+    "name": "hushscreen",
+    "description": "A calm, cinematic web client for Jellyfin servers",
     "lang": "en-US",
-    "short_name": "Jellyfin",
+    "short_name": "hushscreen",
     "start_url": "index.html#/home",
     "theme_color": "#101010",
     "background_color": "#101010",

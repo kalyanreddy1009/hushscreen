@@ -21,3 +21,15 @@ config.json
 
 # environment related
 .envrc
+
+# personal / local-only (never published)
+IMPLEMENTATION_PLAN.md
+*.local.md
+*.local.*
+.env
+.env.*
+!.env.example
+deploy/
+*.zip
+*.ps1
+.claude/

@@ -1,56 +1,64 @@
-<h1 align="center">Jellyfin Web</h1>
-<h3 align="center">Part of the <a href="https://jellyfin.org">Jellyfin Project</a></h3>
-
----
+<h1 align="center">hushscreen</h1>
 
 <p align="center">
-<img alt="Logo Banner" src="https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/banner-logo-solid.svg?sanitize=true"/>
-<br/>
-<br/>
-<a href="https://github.com/jellyfin/jellyfin-web">
-<img alt="GPL 2.0 License" src="https://img.shields.io/github/license/jellyfin/jellyfin-web.svg"/>
-</a>
-<a href="https://github.com/jellyfin/jellyfin-web/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/jellyfin/jellyfin-web.svg"/>
-</a>
-<a href="https://translate.jellyfin.org/projects/jellyfin/jellyfin-web/?utm_source=widget">
-<img src="https://translate.jellyfin.org/widgets/jellyfin/-/jellyfin-web/svg-badge.svg" alt="Translation Status"/>
-</a>
-<br/>
-<a href="https://opencollective.com/jellyfin">
-<img alt="Donate" src="https://img.shields.io/opencollective/all/jellyfin.svg?label=backers"/>
-</a>
-<a href="https://features.jellyfin.org">
-<img alt="Feature Requests" src="https://img.shields.io/badge/fider-vote%20on%20features-success.svg"/>
-</a>
-<a href="https://matrix.to/#/+jellyfin:matrix.org">
-<img alt="Chat on Matrix" src="https://img.shields.io/matrix/jellyfin:matrix.org.svg?logo=matrix"/>
-</a>
-<a href="https://www.reddit.com/r/jellyfin">
-<img alt="Join our Subreddit" src="https://img.shields.io/badge/reddit-r%2Fjellyfin-%23FF5700.svg"/>
-</a>
+<img src="src/assets/img/brand/icon-transparent.png" alt="hushscreen logo" width="96"/>
 </p>
 
-Jellyfin Web is the frontend used for most of the clients available for end users, such as desktop browsers, Android, and iOS. We welcome all contributions and pull requests! If you have a larger feature in mind please open an issue so we can discuss the implementation before you start. Translations can be improved very easily from our <a href="https://translate.jellyfin.org/projects/jellyfin/jellyfin-web">Weblate</a> instance. Look through the following graphic to see if your native language could use some work!
+<p align="center"><strong>A calm, cinematic web client for Jellyfin servers.</strong></p>
 
-<a href="https://translate.jellyfin.org/engage/jellyfin/?utm_source=widget">
-<img src="https://translate.jellyfin.org/widgets/jellyfin/-/jellyfin-web/multi-auto.svg" alt="Detailed Translation Status"/>
-</a>
+hushscreen is based on Jellyfin Web 10.11.11. It is not affiliated with or endorsed by the Jellyfin project. It works with Jellyfin server 10.11.x.
 
-## Build Process
+## Features
+
+- **Glass theme.** A glass-material theme (theme id `liquidglass`) with a full-bleed home hero and a redesigned details page.
+- **Background trailers.** After you rest on a title for about 7 seconds, a muted trailer fades in place of the backdrop. This works on the details page, the home hero, and the focused card on TV layouts. Trailers stay off when reduced motion is on, when Save-Data is on, or when the browser tab is hidden.
+- **Personal home rows.** Rows such as Because You Watched, Because You Liked, Top Picks for You, Highly Rated, Not Yet Watched, and New in Your Genres. They are built from your play history and the server's similar-items data.
+- **Quality badges.** Badges for video and audio formats, using the official format logos. Supported formats include Dolby Vision, HDR, Dolby Atmos, Dolby TrueHD, Dolby Digital, Dolby Digital Plus, DTS, and DTS-HD Master Audio.
+- **TV layout.** Layout and focus refinements for TV screens.
+
+## Requirements
+
+- Node.js 20 or later
+- npm 9.6.4 or later, below 11
+- A Jellyfin server running version 10.11.x
+
+## Install
+
+1. Clone the repository and install the dependencies.
+
+   ```sh
+   git clone https://github.com/kalyanreddy1009/hushscreen.git
+   cd hushscreen
+   npm ci
+   ```
+
+2. Build the production web client. The output goes to the `dist/` folder.
+
+   ```sh
+   npm run build:production
+   ```
+
+3. Serve the `dist/` folder as the web client of your Jellyfin server. Use one of these methods:
+
+   - Start the server with the `--webdir` option set to the path of the `dist/` folder. See the [Jellyfin documentation](https://jellyfin.org/docs/) for how to start the server with options.
+   - Or replace the web folder bundled with the server with the contents of `dist/`.
+
+4. Open the server in a browser. Go to **Settings > Display** and choose the `liquidglass` theme.
+
+## Development
 
 ### Dependencies
 
 - [Node.js](https://nodejs.org/en/download)
 - npm (included in Node.js)
 
-### Getting Started
+### Getting started
 
 1. Clone or download this repository.
 
    ```sh
-   git clone https://github.com/jellyfin/jellyfin-web.git
-   cd jellyfin-web
+   git clone https://github.com/kalyanreddy1009/hushscreen.git
+   cd hushscreen
    ```
 
 2. Install build dependencies in the project directory.
@@ -71,41 +79,58 @@ Jellyfin Web is the frontend used for most of the clients available for end user
    npm run build:development
    ```
 
-## Directory Structure
+5. Build the production client.
 
-> [!NOTE]
-> We are in the process of refactoring to a [new structure](https://forum.jellyfin.org/t-proposed-update-to-the-structure-of-jellyfin-web) based on [Bulletproof React](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) architecture guidelines.
-> Most new code should be organized under the appropriate app directory unless it is common/shared.
+   ```sh
+   npm run build:production
+   ```
+
+### Directory structure
 
 ```
 .
 └── src
     ├── apps
-    │   ├── dashboard           # Admin dashboard app
-    │   ├── experimental        # New experimental app
-    │   ├── stable              # Classic (stable) app
-    │   └── wizard              # Startup wizard app
+    │   ├── dashboard           # Admin dashboard app
+    │   ├── experimental        # New experimental app
+    │   ├── stable              # Classic (stable) app
+    │   └── wizard              # Startup wizard app
     ├── assets                  # Static assets
     ├── components              # Higher order visual components and React components
     ├── constants               # Common constant values
-    ├── controllers             # Legacy page views and controllers 🧹 ❌
-    ├── elements                # Basic webcomponents and React equivalents 🧹
+    ├── controllers             # Legacy page views and controllers (deprecated, do not add new files)
+    ├── elements                # Basic webcomponents and React equivalents (needs cleanup)
     ├── hooks                   # Custom React hooks
     ├── lib                     # Reusable libraries
-    │   ├── globalize           # Custom localization library
-    │   ├── jellyfin-apiclient  # Supporting code for the deprecated apiclient package
-    │   ├── legacy              # Polyfills for legacy browsers
-    │   ├── navdrawer           # Navigation drawer library for classic layout
-    │   └── scroller            # Content scrolling library
+    │   ├── globalize           # Custom localization library
+    │   ├── jellyfin-apiclient  # Supporting code for the deprecated apiclient package
+    │   ├── legacy              # Polyfills for legacy browsers
+    │   ├── navdrawer           # Navigation drawer library for classic layout
+    │   └── scroller            # Content scrolling library
     ├── plugins                 # Client plugins (features dynamically loaded at runtime)
-    ├── scripts                 # Random assortment of visual components and utilities 🐉 ❌
+    ├── scripts                 # Random assortment of visual components and utilities (deprecated, do not add new files)
     ├── strings                 # Translation files (only commit changes to en-us.json)
     ├── styles                  # Common app Sass stylesheets
-    ├── themes                  # Sass and MUI themes
+    ├── themes                  # Sass and MUI themes, including the liquidglass theme
     ├── types                   # Common TypeScript interfaces/types
     └── utils                   # Utility functions
 ```
 
-- ❌ &mdash; Deprecated, do **not** create new files here
-- 🧹 &mdash; Needs cleanup
-- 🐉 &mdash; Serious mess (Here be dragons)
+Most new code belongs under the appropriate app directory unless it is common or shared.
+
+## Privacy
+
+- Background trailers load only when a trailer is about to play. The YouTube IFrame Player API script loads from `www.youtube.com`, and the player itself loads from `www.youtube-nocookie.com`.
+- hushscreen adds no other third-party requests. Its other data comes from your own Jellyfin server.
+
+## Credits
+
+hushscreen is built on Jellyfin Web. Thanks to the [Jellyfin contributors](https://github.com/jellyfin/jellyfin-web) and the names listed in [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
+- Upstream project: [github.com/jellyfin/jellyfin-web](https://github.com/jellyfin/jellyfin-web)
+
+## License and trademarks
+
+hushscreen is free software licensed under the GNU General Public License, version 2 or later (GPL-2.0-or-later). The full text is in [LICENSE](LICENSE). Source code must remain available under the same terms.
+
+Copyright and attribution notices, and trademark notices for third-party names and format logos, are in [NOTICE](NOTICE).

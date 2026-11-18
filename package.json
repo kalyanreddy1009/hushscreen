@@ -1,8 +1,8 @@
 {
-  "name": "jellyfin-web",
+  "name": "hushscreen",
   "version": "10.11.11",
-  "description": "Web interface for Jellyfin",
-  "repository": "https://github.com/jellyfin/jellyfin-web",
+  "description": "A calm, cinematic web client for Jellyfin servers",
+  "repository": "https://github.com/kalyanreddy1009/hushscreen",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@babel/core": "7.27.4",
