@@ -3,7 +3,9 @@ import escapeHtml from 'escape-html';
 import type { ApiClient } from 'jellyfin-apiclient';
 
 import cardBuilder from '../../cardbuilder/cardBuilder';
+import { bindGlassTiles, renderGlassTiles, type GlassTileShape } from '../../liquidglass/glassTile';
 import globalize from '../../../lib/globalize';
+import { isLiquidGlass } from '../../../themes/liquidglass/isLiquidGlass';
 import { getBackdropShape, getPortraitShape } from '../../../utils/card';
 
 import type { SectionContainerElement } from './section';
@@ -19,6 +21,8 @@ const TOP_PICKS_FETCH_LIMIT = 40;
 const SIMILAR_FETCH_LIMIT = 20;
 const TILE_IMAGE_FIELDS = 'PrimaryImageAspectRatio';
 const TILE_IMAGE_TYPES = 'Primary,Backdrop,Thumb';
+const GLASS_TILE_FIELDS = 'Genres,Overview';
+const glassRowUnbinds = new WeakMap<Element, () => void>();
 
 export interface RecommendationRow {
     title: string;
@@ -167,7 +171,27 @@ function getRowCardsHtml(row: RecommendationRow, items: BaseItemDto[]): string {
     });
 }
 
-function appendRow(container: HTMLElement, row: RecommendationRow): void {
+/** Adds the Liquid Glass tile fields to a Fields list. Stock themes get the list back unchanged. */
+export function withGlassTileFields(fields: string): string {
+    return isLiquidGlass() ? `${fields},${GLASS_TILE_FIELDS}` : fields;
+}
+
+/**
+ * Renders a row as glass tiles and wires their clicks to the row container. Each render replaces the
+ * wiring of the previous render, so a refreshed row never stacks listeners.
+ */
+export function renderGlassRow(
+    container: Element,
+    apiClient: ApiClient,
+    items: BaseItemDto[],
+    shape: GlassTileShape
+): string {
+    glassRowUnbinds.get(container)?.();
+    glassRowUnbinds.set(container, bindGlassTiles(container as HTMLElement, apiClient));
+    return renderGlassTiles(items, { shape });
+}
+
+function appendRow(container: HTMLElement, row: RecommendationRow, apiClient: ApiClient): void {
     const section = document.createElement('div');
     section.classList.add('verticalSection', 'lg-rec-section');
     section.innerHTML = renderRowHtml(row);
@@ -176,7 +200,12 @@ function appendRow(container: HTMLElement, row: RecommendationRow): void {
     if (!itemsContainer) return;
 
     itemsContainer.fetchData = () => Promise.resolve(row.items);
-    itemsContainer.getItemsHtml = items => getRowCardsHtml(row, items);
+    if (isLiquidGlass()) {
+        itemsContainer.classList.add('lg-tiles-row');
+        itemsContainer.getItemsHtml = items => renderGlassRow(itemsContainer, apiClient, items, row.landscape ? 'landscape' : 'portrait');
+    } else {
+        itemsContainer.getItemsHtml = items => getRowCardsHtml(row, items);
+    }
     itemsContainer.parentContainer = section;
     container.appendChild(section);
 }
@@ -245,7 +274,7 @@ function getUnwatchedMovies(
         IsPlayed: false,
         SortOrder: 'Descending',
         Limit: ROW_LIMIT,
-        Fields: TILE_IMAGE_FIELDS,
+        Fields: withGlassTileFields(TILE_IMAGE_FIELDS),
         ImageTypeLimit: 1,
         EnableImageTypes: TILE_IMAGE_TYPES,
         ...options
@@ -257,7 +286,7 @@ function getSimilarItems(apiClient: ApiClient, userId: string, baseline: BaseIte
     const url = apiClient.getUrl('Items/' + baseline.Id + '/Similar', {
         userId,
         limit: SIMILAR_FETCH_LIMIT,
-        fields: TILE_IMAGE_FIELDS
+        fields: withGlassTileFields(TILE_IMAGE_FIELDS)
     });
     return (apiClient.getJSON(url) as Promise<SimilarItemsResult>)
         .then(result => (Array.isArray(result?.Items) ? result.Items : []));
@@ -347,6 +376,6 @@ export async function loadRecommendationRows(
     ];
 
     for (const row of dedupeRows(rows)) {
-        appendRow(container, row);
+        appendRow(container, row, apiClient);
     }
 }

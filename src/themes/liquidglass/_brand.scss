@@ -1,0 +1,147 @@
+// HushScreen lockup: layout and the one-shot "doors open" intro for the inline mark from
+// components/liquidglass/brandMark.ts. Only transform and opacity animate. The static markup is the final frame,
+// so `.hs-animate` is opt-in. The splash in styles/site.scss carries a scoped copy because it shows before this
+// theme loads (keyframe names match so the two never restart each other).
+
+$hs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+$hs-word-scale: 0.443;
+$hs-gap: 0.06;
+$hs-mark-pad: -0.2;
+
+.hs-lockup {
+    --hs-mark: 96px;
+
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    color: #f3ede4;
+    text-decoration: none;
+
+    .hs-mark {
+        flex: none;
+        width: var(--hs-mark);
+        height: var(--hs-mark);
+        margin: 0 calc(var(--hs-mark) * #{$hs-mark-pad});
+        overflow: visible;
+    }
+
+    .hs-wordmark {
+        margin-inline-start: calc(var(--hs-mark) * #{$hs-gap});
+        font-family: 'Noto Sans', system-ui, sans-serif;
+        font-size: calc(var(--hs-mark) * #{$hs-word-scale});
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        line-height: 1;
+        white-space: nowrap;
+    }
+}
+
+// Interactive lockups (links or buttons) brighten the interior light on hover.
+a.hs-lockup .hs-light,
+button.hs-lockup .hs-light {
+    opacity: 0.85;
+    transition: opacity 150ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    a.hs-lockup:hover .hs-light,
+    button.hs-lockup:hover .hs-light {
+        opacity: 1;
+    }
+}
+
+.hs-slab-l {
+    transform-origin: 208px 256px;
+}
+
+.hs-slab-r {
+    transform-origin: 304px 256px;
+}
+
+.hs-glow {
+    transform-origin: 256px 404px;
+}
+
+.hs-pool {
+    transform-origin: 256px 432px;
+}
+
+@keyframes hs-open {
+    from {
+        opacity: 0;
+        transform: scaleX(0.55);
+    }
+
+    to {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+@keyframes hs-rise {
+    from {
+        opacity: 0;
+        transform: scaleY(0.6);
+    }
+
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+@keyframes hs-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes hs-word {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hs-animate {
+    .hs-slab {
+        animation: hs-open 600ms $hs-ease both;
+    }
+
+    .hs-lintel {
+        animation: hs-fade 450ms $hs-ease 150ms both;
+    }
+
+    .hs-light-fx {
+        animation: hs-rise 900ms $hs-ease 300ms both;
+    }
+
+    .hs-rim {
+        animation: hs-fade 700ms $hs-ease 600ms both;
+    }
+
+    .hs-wordmark {
+        animation: hs-word 700ms $hs-ease 600ms both;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hs-animate {
+        .hs-slab,
+        .hs-lintel,
+        .hs-light-fx,
+        .hs-rim,
+        .hs-wordmark {
+            animation: hs-fade 200ms linear both;
+        }
+    }
+}

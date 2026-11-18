@@ -28,12 +28,14 @@ import Dashboard, { pageClassOn } from '../utils/dashboard';
 import { PluginType } from '../types/plugin.ts';
 import Events from '../utils/events.ts';
 import { getParameterByName } from '../utils/url.ts';
+import { renderBrandMark } from '../components/liquidglass/brandMark';
 import datetime from '../scripts/datetime';
 import { initBottomTabBar } from '../components/liquidglass/bottomTabBar';
 import { initHeaderScroll } from '../components/liquidglass/headerScroll';
 import { initCardTilt } from '../components/liquidglass/cardTilt';
 import { initTvCardTrailer } from '../components/liquidglass/tvCardTrailer';
 import { initAmbient } from '../components/liquidglass/ambient';
+import { initNewSince } from '../components/liquidglass/newSince';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -44,10 +46,14 @@ import '../styles/flexstyles.scss';
 function renderHeader() {
     let html = '';
     html += '<div class="flex align-items-center flex-grow headerTop">';
+    // Glass theme only: shown by _nav.scss when the page has no title of its own (see setDefaultTitle)
+    html += '<a href="#/home" class="lg-wordmark" aria-label="' + escapeHtml(globalize.translate('LiquidGlassBrandHome')) + '"><span class="lg-wordmark__mark" aria-hidden="true">' + renderBrandMark({ size: 28, idPrefix: 'hs-hdr' }) + '</span><span class="lg-wordmark__text">HushScreen</span></a>';
     html += '<div class="headerLeft">';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerButtonLeft headerBackButton hide"><span class="material-icons ' + (browser.safari ? 'chevron_left' : 'arrow_back') + '" aria-hidden="true"></span></button>';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerHomeButton hide barsMenuButton headerButtonLeft"><span class="material-icons home" aria-hidden="true"></span></button>';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton mainDrawerButton barsMenuButton headerButtonLeft hide"><span class="material-icons menu" aria-hidden="true"></span></button>';
+    // Glass theme, desktop only: search field; the hide class follows the logged-in state like headerSearchButton
+    html += '<a href="#/search" class="lg-search-pill hide" hidden><span class="material-icons search" aria-hidden="true"></span><span class="lg-search-pill__label"></span></a>';
     html += '<h3 class="pageTitle" aria-hidden="true"></h3>';
     html += '</div>';
     html += '<div class="headerRight">';
@@ -56,6 +62,8 @@ function renderHeader() {
     html += '<button is="paper-icon-button-light" class="headerAudioPlayerButton audioPlayerButton headerButton headerButtonRight hide"><span class="material-icons music_note" aria-hidden="true"></span></button>';
     html += '<button is="paper-icon-button-light" class="headerCastButton castButton headerButton headerButtonRight hide"><span class="material-icons cast" aria-hidden="true"></span></button>';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerButtonRight headerSearchButton hide"><span class="material-icons search" aria-hidden="true"></span></button>';
+    // Glass theme bell slot: left empty and hidden here; newSince.ts fills it and removes the hidden attribute
+    html += '<div class="lg-header-bell" hidden></div>';
     html += '<button is="paper-icon-button-light" class="headerButton headerButtonRight headerUserButton hide"><span class="material-icons person" aria-hidden="true"></span></button>';
     html += '<div class="currentTimeText hide"></div>';
     html += '</div>';
@@ -76,6 +84,7 @@ function renderHeader() {
     headerCastButton = skinHeader.querySelector('.headerCastButton');
     headerAudioPlayerButton = skinHeader.querySelector('.headerAudioPlayerButton');
     headerSearchButton = skinHeader.querySelector('.headerSearchButton');
+    headerSearchPill = skinHeader.querySelector('.lg-search-pill');
     headerSyncButton = skinHeader.querySelector('.headerSyncButton');
     currentTimeText = skinHeader.querySelector('.currentTimeText');
 
@@ -133,6 +142,10 @@ function retranslateUi() {
         headerSearchButton.title = globalize.translate('Search');
     }
 
+    if (headerSearchPill) {
+        headerSearchPill.querySelector('.lg-search-pill__label').textContent = globalize.translate('Search');
+    }
+
     if (headerUserButton) {
         headerUserButton.title = globalize.translate('Settings');
     }
@@ -168,6 +181,10 @@ function updateUserInHeader(user) {
             headerSearchButton.classList.remove('hide');
         }
 
+        if (headerSearchPill) {
+            headerSearchPill.classList.remove('hide');
+        }
+
         if (!layoutManager.tv) {
             headerCastButton.classList.remove('hide');
         }
@@ -191,6 +208,10 @@ function updateUserInHeader(user) {
 
         if (headerSearchButton) {
             headerSearchButton.classList.add('hide');
+        }
+
+        if (headerSearchPill) {
+            headerSearchPill.classList.add('hide');
         }
     }
 
@@ -696,13 +717,14 @@ let navDrawerInstance;
 let mainDrawerButton;
 let headerHomeButton;
 let currentDrawerType;
-let documentTitle = 'hushscreen';
+let documentTitle = 'HushScreen';
 let pageTitleElement;
 let headerBackButton;
 let headerUserButton;
 let currentUser;
 let headerCastButton;
 let headerSearchButton;
+let headerSearchPill;
 let headerAudioPlayerButton;
 let headerSyncButton;
 let currentTimeText;
@@ -865,6 +887,7 @@ initBottomTabBar({ openLibraries: openMainDrawer });
 initCardTilt();
 initTvCardTrailer();
 initAmbient();
+initNewSince();
 
 const LibraryMenu = {
     getTopParentId,

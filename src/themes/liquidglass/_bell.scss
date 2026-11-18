@@ -1,0 +1,197 @@
+// bell — 'New since your last visit' header bell and popover (src/components/liquidglass/newSince.ts).
+@use 'mixins' as *;
+
+$lg-bell-visual: 36px;
+$lg-bell-dot: 8px;
+$lg-bell-ring: 2px;
+$lg-bell-popover-width: min(22rem, 92vw);
+$lg-bell-thumb-width: 85px;
+$lg-bell-thumb-height: 48px;
+$lg-bell-row-min: var(--lg-hit-min);
+
+// Bell button: 44px hit target (slot in _nav.scss), 36px visual circle like the other header icon buttons
+.lg-bell {
+    @include hit-target;
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--lg-text);
+    cursor: pointer;
+
+    // Visual circle, painted behind the icon
+    &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: $lg-bell-visual;
+        height: $lg-bell-visual;
+        border-radius: var(--lg-radius-pill);
+        background-color: transparent;
+        transform: translate(-50%, -50%);
+        transition: background-color var(--lg-dur-micro) var(--lg-ease-out);
+    }
+
+    @media (hover: hover) {
+        &:hover::before {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+    }
+
+    &[aria-expanded='true']::before {
+        background-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .lg-bell__icon {
+        position: relative;
+        font-size: 1.375rem;
+    }
+
+    // Unread dot: accent colour with a ring in the header glass so it reads over the capsule
+    .lg-bell__dot {
+        position: absolute;
+        top: calc(50% - #{$lg-bell-visual} / 2 + 3px);
+        right: calc(50% - #{$lg-bell-visual} / 2 + 3px);
+        width: $lg-bell-dot;
+        height: $lg-bell-dot;
+        border-radius: var(--lg-radius-pill);
+        background-color: var(--lg-accent);
+        box-shadow: 0 0 0 $lg-bell-ring var(--lg-glass-regular-fill);
+    }
+
+    .lg-bell__dot[hidden] {
+        display: none;
+    }
+}
+
+// Popover: functional layer, so glass. Fixed under the bell; positioned from the bell in newSince.ts.
+.lg-new-since {
+    @include glass(regular);
+
+    position: fixed;
+    z-index: 1000;
+    box-sizing: border-box;
+    width: $lg-bell-popover-width;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: var(--lg-space-3);
+    border-radius: var(--lg-radius-lg);
+    box-shadow: inset 0 1px 0 var(--lg-glass-specular), var(--lg-shadow-panel);
+    color: var(--lg-text);
+    transform-origin: top right;
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    transition:
+        opacity var(--lg-dur-micro) var(--lg-ease-out),
+        transform var(--lg-dur-focus) var(--lg-ease-out);
+
+    &:focus {
+        outline: none;
+    }
+
+    &[hidden] {
+        display: none;
+    }
+
+    &.is-open {
+        opacity: 1;
+        transform: none;
+    }
+
+    // Reduced motion: fade only, no movement
+    @media (prefers-reduced-motion: reduce) {
+        transform: none;
+        transition: opacity var(--lg-dur-focus) linear;
+    }
+
+    // Reduced transparency: opaque fill, no see-through
+    @media (prefers-reduced-transparency: reduce) {
+        background-color: var(--lg-glass-solid);
+    }
+
+    // Increased contrast: solid edge
+    @media (prefers-contrast: more) {
+        background-color: var(--lg-glass-solid);
+        border-color: var(--lg-text-secondary);
+    }
+}
+
+.lg-new-since__heading {
+    padding: var(--lg-space-2) var(--lg-space-3);
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-small);
+    text-transform: uppercase;
+}
+
+.lg-new-since__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+// Rows are links to the item; at least 44px tall, focus ring from the mixin
+.lg-new-since__row {
+    @include focus-ring(var(--lg-radius-md));
+
+    display: flex;
+    align-items: center;
+    gap: var(--lg-space-3);
+    min-height: $lg-bell-row-min;
+    padding: var(--lg-space-2) var(--lg-space-3);
+    border-radius: var(--lg-radius-md);
+    color: inherit;
+    text-decoration: none;
+
+    @media (hover: hover) {
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+    }
+}
+
+.lg-new-since__thumb {
+    flex: 0 0 auto;
+    width: $lg-bell-thumb-width;
+    height: $lg-bell-thumb-height;
+    border-radius: var(--lg-radius-sm);
+    object-fit: cover;
+    background-color: var(--lg-surface-2);
+}
+
+.lg-new-since__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.lg-new-since__name {
+    overflow: hidden;
+    color: var(--lg-text);
+    font-size: var(--lg-type-callout);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lg-new-since__subtitle {
+    overflow: hidden;
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-footnote);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lg-new-since__empty {
+    margin: 0;
+    padding: var(--lg-space-3);
+    color: var(--lg-text-secondary);
+    font-size: var(--lg-type-callout);
+}

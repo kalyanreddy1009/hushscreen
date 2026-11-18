@@ -1,63 +1,82 @@
-// hero — Cinematic home hero (markup from src/components/homesections/hero/).
-// Owned by task T4. Glass only on the functional layer (secondary controls); the hero surface is content.
+// hero — Home hero carousel (markup from src/components/homesections/hero/).
+// A centred card with the previous and next slides peeking at the sides. hero.ts drives every slide's
+// transform and opacity from one position value (see carouselPhysics.ts); this file only lays the cards out.
+// Glass only on the functional layer (secondary controls); the card itself is content.
 @use 'mixins' as *;
 
 .lg-hero {
-    // tv.apple.com: the hero fills ~89% of the viewport and runs under the top bar
-    --lg-hero-height: min(70vh, 640px);
+    // Card width; height follows the aspect ratio but never drops below what the copy needs
+    --lg-hero-card-w: min(72vw, 1100px);
+    --lg-hero-card-h: max(calc(var(--lg-hero-card-w) * 0.4375), 24rem);
+    --lg-hero-scrim: 0.9;
 
     position: relative;
     width: 100%;
-    height: var(--lg-hero-height);
-    min-height: 22rem;
-    margin-bottom: var(--lg-space-5);
-    overflow: hidden;
-    background: var(--lg-bg);
+    margin-block: var(--lg-space-4) var(--lg-space-3);
     color: var(--lg-text);
 
-    @media (min-width: 640px) {
-        --lg-hero-height: min(76vh, 820px);
+    @media (max-width: 639px) {
+        --lg-hero-card-w: 86vw;
+        --lg-hero-card-h: max(calc(var(--lg-hero-card-w) * 1.25), 26rem);
     }
 
-    @media (min-width: 1024px) {
-        --lg-hero-height: min(86vh, 1000px);
+    @media (prefers-contrast: more) {
+        --lg-hero-scrim: 1;
     }
 }
 
-.lg-hero__slides {
-    position: absolute;
-    inset: 0;
+// Clips the side cards at the screen edge. Block padding leaves room for the card shadow.
+.lg-hero__viewport {
+    position: relative;
+    padding-block: var(--lg-space-3) var(--lg-space-5);
+    overflow: hidden;
+    transition: opacity var(--lg-dur-artwork) var(--lg-ease-out);
+}
+
+.lg-hero__track {
+    position: relative;
+    height: var(--lg-hero-card-h);
+    // Vertical page scroll stays with the browser; horizontal moves belong to the carousel
+    touch-action: pan-y;
+    isolation: isolate;
+    user-select: none;
+}
+
+.lg-hero--dragging .lg-hero__track {
+    cursor: grabbing;
 }
 
 .lg-hero__slide {
     position: absolute;
-    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: 50%;
     display: flex;
     align-items: flex-end;
-    opacity: 0;
-    pointer-events: none;
-    visibility: hidden;
-    // Visibility flips after the fade-out so the crossfade plays, yet inactive slides are unreachable
-    transition:
-        opacity var(--lg-dur-artwork) var(--lg-ease-in-out),
-        visibility 0s linear var(--lg-dur-artwork);
+    box-sizing: border-box;
+    width: var(--lg-hero-card-w);
+    overflow: hidden;
+    border-radius: var(--lg-radius-xl, 28px);
+    background: var(--lg-bg-elevated);
+    box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    isolation: isolate;
+    // Centred until hero.ts writes the live transform
+    transform: translate3d(-50%, 0, 0);
+    will-change: transform, opacity;
 
     &.is-active {
-        opacity: 1;
-        pointer-events: auto;
-        visibility: visible;
-        transition-delay: 0s;
+        cursor: grab;
     }
 
-    // Bottom + left readability gradients into the page background
+    // Readability scrim: dark at the bottom where the copy sits, easing out toward the artwork
     &::after {
         content: '';
         position: absolute;
         inset: 0;
         background:
-            linear-gradient(to top, var(--lg-bg) 0%, rgba(var(--lg-bg-rgb), 0.72) 28%, transparent 62%),
-            linear-gradient(to right, rgba(var(--lg-bg-rgb), 0.78) 0%, rgba(var(--lg-bg-rgb), 0.4) 38%, transparent 70%),
-            linear-gradient(to bottom, rgba(var(--lg-bg-rgb), 0.55) 0%, transparent 22%);
+            linear-gradient(to top, rgba(0, 0, 0, var(--lg-hero-scrim)) 0%, rgba(0, 0, 0, 0.78) 38%, rgba(0, 0, 0, 0.35) 66%, transparent 100%),
+            linear-gradient(to right, rgba(0, 0, 0, 0.45) 0%, transparent 62%);
         pointer-events: none;
     }
 }
@@ -69,6 +88,7 @@
     height: 100%;
     object-fit: cover;
     object-position: center 20%;
+    -webkit-user-drag: none;
 }
 
 .lg-hero__content {
@@ -80,8 +100,12 @@
     gap: var(--lg-space-3);
     box-sizing: border-box;
     width: min(100%, 44rem);
-    // Top padding keeps content clear of the glass header that overlaps the hero
-    padding: 5rem var(--lg-gutter) var(--lg-space-6);
+    padding: var(--lg-space-6);
+
+    @media (max-width: 639px) {
+        gap: var(--lg-space-2);
+        padding: var(--lg-space-5) var(--lg-space-4);
+    }
 }
 
 .lg-hero__heading {
@@ -96,16 +120,17 @@
     max-height: 120px;
     object-fit: contain;
     object-position: left bottom;
+    -webkit-user-drag: none;
 
     @media (max-width: 639px) {
-        max-width: 70vw;
-        max-height: 88px;
+        max-width: 60vw;
+        max-height: 72px;
     }
 }
 
 .lg-hero__title {
     font-family: var(--lg-font-display);
-    font-size: var(--lg-type-display);
+    font-size: clamp(1.75rem, 3.4vw, 3.25rem);
     font-weight: 700;
     letter-spacing: var(--lg-track-display);
     line-height: 1.05;
@@ -119,20 +144,25 @@
     font-weight: 500;
 }
 
-// Line one: "Movie · Sci-Fi · Adventure"
+// Line one: type and genre chips ("Movie", "Sci-Fi", "Adventure")
 .lg-hero__meta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--lg-space-1) var(--lg-space-2);
-    color: var(--lg-text);
-    font-size: var(--lg-type-callout);
+    gap: var(--lg-space-2);
+    font-size: var(--lg-type-footnote);
     font-weight: 600;
     letter-spacing: var(--lg-track-small);
 
-    > span + span::before {
-        content: '\00b7';
-        margin-inline-end: var(--lg-space-2);
+    > span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.75rem;
+        padding: 0 var(--lg-space-3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--lg-radius-pill);
+        background: rgba(255, 255, 255, 0.14);
+        color: var(--lg-text);
     }
 
     &:empty {
@@ -272,21 +302,44 @@
     color: var(--lg-signal-danger);
 }
 
-// Pager + previous/next
-.lg-hero__controls {
+// Previous/next: sit on the peeking cards, hover-revealed on pointer devices, hidden on phones (swipe and dots)
+.lg-hero__nav {
     position: absolute;
-    inset-inline: var(--lg-gutter);
-    bottom: var(--lg-space-5);
-    z-index: 2;
+    top: calc(var(--lg-space-3) + (var(--lg-hero-card-h) - var(--lg-hit-min)) / 2);
+
+    &.lg-hero__nav--prev {
+        inset-inline-start: var(--lg-space-3);
+    }
+
+    &.lg-hero__nav--next {
+        inset-inline-end: var(--lg-space-3);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        opacity: 0;
+        transition: opacity var(--lg-dur-glass) var(--lg-ease-out), transform var(--lg-dur-micro) var(--lg-ease-out);
+    }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .lg-hero:hover .lg-hero__nav,
+    .lg-hero:focus-within .lg-hero__nav {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 639px) {
+    .lg-hero__nav {
+        display: none;
+    }
+}
+
+// Pager, centred under the track
+.lg-hero__controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     align-items: center;
     gap: var(--lg-space-3);
-    pointer-events: none;
-
-    > * {
-        pointer-events: auto;
-    }
 }
 
 .lg-hero__dots {
@@ -320,55 +373,33 @@
     }
 }
 
-// Previous/next: hover-revealed on pointer devices, always focusable and always visible on touch
-.lg-hero__nav {
-    @media (hover: hover) and (pointer: fine) {
-        opacity: 0;
-        transition: opacity var(--lg-dur-glass) var(--lg-ease-out), transform var(--lg-dur-micro) var(--lg-ease-out);
-    }
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .lg-hero:hover .lg-hero__nav,
-    .lg-hero:focus-within .lg-hero__nav {
-        opacity: 1;
-    }
-}
-
-@media (max-width: 639px) {
-    .lg-hero__nav {
-        display: none;
-    }
-
-    .lg-hero__controls {
-        justify-content: center;
-    }
-
-    // Centred dots would sit on the action row (their 44px targets swallowed taps on Info/Favorite);
-    // reserve the controls' row below the actions instead
-    .lg-hero__content {
-        padding-bottom: calc(var(--lg-space-5) + var(--lg-hit-min) + var(--lg-space-2));
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
+// Reduced motion: no sliding. Cards stack in the centre and cross-fade (hero.ts adds the class and clears
+// the inline transforms), so the only thing that changes on screen is opacity.
+.lg-hero--crossfade {
     .lg-hero__slide {
-        transition-duration: 1ms;
-    }
-}
-
-// First paint: height is reserved by .lg-hero itself; the backdrop and text stay hidden together until
-// the first backdrop is ready, then fade in as one (the slide's opacity transition carries it).
-.lg-hero--pending {
-    .lg-hero__slide,
-    .lg-hero__slide.is-active {
         opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        cursor: default;
+        transition:
+            opacity 200ms linear,
+            visibility 0s linear 200ms;
+
+        &.is-active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transition-delay: 0s;
+        }
+    }
+
+    .lg-hero__track {
+        cursor: default;
     }
 }
 
-// Full bleed: on the home tab that shows the hero, the page drops its header clearance so the artwork runs
-// under the floating glass header (the header's top scrim and the hero's own top gradient keep it legible).
-// Scoped to the active tab so Favorites keeps its offset; no :has() support = the stock offset stays.
-#indexPage.homePage:has(.pageTabContent.is-active .lg-hero) {
-    padding-top: 0 !important;
+// First paint: the card's height is reserved by the track; everything fades in together once the first
+// backdrop is ready.
+.lg-hero--pending .lg-hero__viewport {
+    opacity: 0;
 }

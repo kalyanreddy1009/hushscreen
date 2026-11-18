@@ -1,2 +1,67 @@
 // ambient — Blurred page background that follows the home hero (src/components/liquidglass/ambient.ts).
 @use 'mixins' as *;
+
+// Fixed, first child of <body>: above the page background colour, below the backgroundContainer and content
+.lg-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+
+    // Darkening scrim over both layers; keeps body text at 4.5:1 or better
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.75) 100%);
+    }
+}
+
+.lg-ambient__layer {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    // Scale hides the blurred edges; filter is static and never animated
+    transform: scale(1.2);
+    filter: blur(60px) saturate(1.2) brightness(0.45);
+    opacity: 0;
+    transition: opacity 1200ms var(--lg-ease-out);
+
+    &.is-visible {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .lg-ambient__layer {
+        display: none;
+    }
+
+    // Flat tint from the artwork colour in place of the blurred image
+    .lg-ambient::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-color: rgb(var(--lg-ambient));
+        opacity: 0.5;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lg-ambient__layer {
+        transition-duration: 1ms;
+    }
+}
+
+@media (prefers-contrast: more) {
+    .lg-ambient {
+        display: none;
+    }
+}
+
+// The page background is opaque by default (_base.scss); while the ambient layer is showing, let it through.
+body:has(> .lg-ambient:not([hidden])) .backgroundContainer {
+    background: transparent;
+}

@@ -114,18 +114,27 @@
     }
 }
 
-// Hero: above the backdrop image, below the bottom gradient and the content (content is z-index 1 in _hero.scss).
+// Hero: the overlay lives inside the centre card, so the card's radius and overflow clip it. It sits above the
+// backdrop image and below the scrim and the content (content is z-index 1 in _hero.scss).
 // Zero rather than 1: the overlay is appended after the content, so an equal z-index would paint it over the text.
 .lg-hero__slide .lg-trailer {
     z-index: 0;
 }
 
-// The hero mute control sits on the action row (Play, Info) rather than at the top edge, so it stays in view.
+// The hero mute control sits on the action row (Play, Info) at the card's bottom-right corner, so it stays in view.
 // Content bottom padding is --lg-space-6 and the action buttons are --lg-hit-min tall, the same as the control,
 // so both share one centre line.
 .lg-hero__slide .lg-trailer__mute {
     top: auto;
     bottom: var(--lg-space-6);
+    inset-inline-end: var(--lg-space-6);
+
+    // Phone card: the action row can wrap to the full width, so the control moves to the top-right corner
+    @media (max-width: 639px) {
+        top: var(--lg-space-3);
+        bottom: auto;
+        inset-inline-end: var(--lg-space-3);
+    }
 }
 
 // Phone strip: the mute control sits in the strip's bottom-right corner

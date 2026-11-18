@@ -1,12 +1,12 @@
-<h1 align="center">hushscreen</h1>
+<h1 align="center">HushScreen</h1>
 
 <p align="center">
-<img src="src/assets/img/brand/icon-transparent.png" alt="hushscreen logo" width="96"/>
+<img src="src/assets/img/brand/icon-transparent.png" alt="HushScreen logo" width="96"/>
 </p>
 
 <p align="center"><strong>A calm, cinematic web client for Jellyfin servers.</strong></p>
 
-hushscreen is based on Jellyfin Web 10.11.11. It is not affiliated with or endorsed by the Jellyfin project. It works with Jellyfin server 10.11.x.
+HushScreen is based on Jellyfin Web 10.11.11. It is not affiliated with or endorsed by the Jellyfin project. It works with Jellyfin server 10.11.x.
 
 ## Features
 
@@ -121,16 +121,16 @@ Most new code belongs under the appropriate app directory unless it is common or
 ## Privacy
 
 - Background trailers load only when a trailer is about to play. The YouTube IFrame Player API script loads from `www.youtube.com`, and the player itself loads from `www.youtube-nocookie.com`.
-- hushscreen adds no other third-party requests. Its other data comes from your own Jellyfin server.
+- HushScreen adds no other third-party requests. Its other data comes from your own Jellyfin server.
 
 ## Credits
 
-hushscreen is built on Jellyfin Web. Thanks to the [Jellyfin contributors](https://github.com/jellyfin/jellyfin-web) and the names listed in [CONTRIBUTORS.md](CONTRIBUTORS.md).
+HushScreen is built on Jellyfin Web. Thanks to the [Jellyfin contributors](https://github.com/jellyfin/jellyfin-web) and the names listed in [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 - Upstream project: [github.com/jellyfin/jellyfin-web](https://github.com/jellyfin/jellyfin-web)
 
 ## License and trademarks
 
-hushscreen is free software licensed under the GNU General Public License, version 2 or later (GPL-2.0-or-later). The full text is in [LICENSE](LICENSE). Source code must remain available under the same terms.
+HushScreen is free software licensed under the GNU General Public License, version 2 or later (GPL-2.0-or-later). The full text is in [LICENSE](LICENSE). Source code must remain available under the same terms.
 
 Copyright and attribution notices, and trademark notices for third-party names and format logos, are in [NOTICE](NOTICE).

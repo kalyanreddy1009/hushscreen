@@ -1,5 +1,4 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
-import escapeHtml from 'escape-html';
 import type { ApiClient } from 'jellyfin-apiclient';
 
 import layoutManager from '../../layoutManager';
@@ -7,22 +6,40 @@ import { playbackManager } from '../../playback/playbackmanager';
 import { appRouter } from '../../router/appRouter';
 import { EventType } from '../../../constants/eventType';
 import globalize from '../../../lib/globalize';
-import { renderInfoBadgesHtml } from '../../liquidglass/qualityBadges';
 import { armTrailerBackdrop, DEFAULT_DELAY_MS, getTrailerVideoId, type TrailerBackdrop } from '../../liquidglass/trailerBackdrop';
 import { isLiquidGlass, prefersReducedMotion } from '../../../themes/liquidglass/isLiquidGlass';
 import Events from '../../../utils/events';
 
+import {
+    DAMPING_DEFAULT,
+    SLIDE_GAP_PX,
+    SPRING_RESPONSE_S,
+    STRIDE_FRACTION,
+    DragGesture,
+    SpringAnimator,
+    canLoop,
+    constrainPosition,
+    dampingForRelease,
+    mod,
+    pickSnapIndex,
+    slideStyle,
+    wrapDistance
+} from './carouselPhysics';
+import { formatRuntime, getImageWidth, getResumeTicks, renderDots, renderNav, renderSlide } from './heroMarkup';
 import { selectHeroItems } from './selectHeroItems';
+
+export { formatRuntime };
 
 const AUTO_ADVANCE_MS = 8000;
 const SOURCE_LIMIT = 5;
 const BACKDROP_MAX_WIDTH = 1920;
 const MOBILE_BACKDROP_MAX_WIDTH = 1280;
-const LOGO_MAX_WIDTH = 600;
 const FIRST_IMAGE_TIMEOUT_MS = 1500;
 const IMAGE_TIMEOUT_MS = 2500;
-const TICKS_PER_MINUTE = 600000000;
-const MAX_GENRES = 2;
+/** Fired on every active-slide change; `detail` is null once the hero is removed. */
+export const HERO_CHANGE_EVENT = 'lg:herochange';
+/** Card width assumed when layout is not measurable. */
+const FALLBACK_SLIDE_WIDTH_PX = 800;
 const HERO_FIELDS = 'Overview,Genres,ProductionYear,RunTimeTicks,OfficialRating,CommunityRating,'
     + 'ParentBackdropImageTags,ParentBackdropItemId,ParentLogoImageTag,ParentLogoItemId,'
     + 'MediaSources,HasSubtitles,CriticRating,ProviderIds,RemoteTrailers';
@@ -63,15 +80,6 @@ export async function fetchHeroItems(apiClient: ApiClient): Promise<BaseItemDto[
     return selectHeroItems(resume, nextUp, latest);
 }
 
-/**
- * Width to request. getScaledImageUrl multiplies by devicePixelRatio, so divide it out to keep the
- * final request at the cap (the server resizes on the fly and can be slow).
- */
-function getImageWidth(cap: number): number {
-    const ratio = window.devicePixelRatio || 1;
-    return Math.floor(cap / ratio);
-}
-
 export function getBackdropUrl(apiClient: ApiClient, item: BaseItemDto): string | undefined {
     const options = { type: 'Backdrop', maxWidth: getImageWidth(layoutManager.mobile ? MOBILE_BACKDROP_MAX_WIDTH : BACKDROP_MAX_WIDTH), quality: 80 };
     if (item.BackdropImageTags?.length && item.Id) {
@@ -83,132 +91,36 @@ export function getBackdropUrl(apiClient: ApiClient, item: BaseItemDto): string 
     return undefined;
 }
 
-function getLogoUrl(apiClient: ApiClient, item: BaseItemDto): string | undefined {
-    const options = { type: 'Logo', maxWidth: getImageWidth(LOGO_MAX_WIDTH), quality: 80 };
-    if (item.ImageTags?.Logo && item.Id) {
-        return apiClient.getScaledImageUrl(item.Id, { ...options, tag: item.ImageTags.Logo });
-    }
-    if (item.ParentLogoImageTag && item.ParentLogoItemId) {
-        return apiClient.getScaledImageUrl(item.ParentLogoItemId, { ...options, tag: item.ParentLogoImageTag });
-    }
-    return undefined;
+interface ShowOptions {
+    /** Skip waiting for the backdrop: the card is already on screen (drag release). */
+    immediate?: boolean;
+    /** A person asked for this change: announce it politely to assistive tech. */
+    user?: boolean;
+    /** Release velocity handed to the spring, in slides per second. */
+    velocity?: number;
+    damping?: number;
 }
 
-export function formatRuntime(ticks: number | null | undefined): string {
-    const minutes = Math.round((ticks ?? 0) / TICKS_PER_MINUTE);
-    if (minutes <= 0) return '';
-    const hours = Math.floor(minutes / 60);
-    const rest = minutes % 60;
-    if (!hours) return `${rest}m`;
-    return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
-function getResumeTicks(item: BaseItemDto): number {
-    return item.UserData?.PlaybackPositionTicks ?? 0;
-}
-
-function getProgressPercent(item: BaseItemDto): number {
-    const total = item.RunTimeTicks ?? 0;
-    const position = getResumeTicks(item);
-    if (!total || position <= 0) return 0;
-    return Math.min(100, Math.max(0, (position / total) * 100));
-}
-
-const TYPE_KEYS: Record<string, string> = { Movie: 'Movie', Series: 'Series', Episode: 'Episode' };
-const FRESH_CRITIC_RATING = 60;
-
-/** Line one: type and genres ("Movie · Sci-Fi · Adventure"). */
-function renderTypeLine(item: BaseItemDto): string {
-    const typeKey = item.Type ? TYPE_KEYS[item.Type] : undefined;
-    const parts = [
-        typeKey ? globalize.translate(typeKey) : '',
-        ...(item.Genres ?? []).slice(0, MAX_GENRES)
-    ].filter(Boolean);
-    return parts.map(part => `<span>${escapeHtml(part)}</span>`).join('');
-}
-
-/** Line two: year, runtime, ratings, then the official rating and quality badges. */
-function renderInfoLine(item: BaseItemDto): string {
-    const items: string[] = [];
-    if (item.ProductionYear) items.push(escapeHtml(String(item.ProductionYear)));
-    const runtime = formatRuntime(item.RunTimeTicks);
-    if (runtime) items.push(escapeHtml(runtime));
-    if (item.CommunityRating) {
-        items.push(`<span class="lg-hero__star"><span aria-hidden="true">★</span> ${item.CommunityRating.toFixed(1)}</span>`);
-    }
-    if (item.CriticRating) {
-        const state = item.CriticRating >= FRESH_CRITIC_RATING ? 'fresh' : 'rotten';
-        items.push(`<span class="lg-hero__critic lg-hero__critic--${state}" title="Rotten Tomatoes">RT ${Math.round(item.CriticRating)}%</span>`);
-    }
-
-    const rating = item.OfficialRating ? `<span class="lg-badge lg-badge--rating">${escapeHtml(item.OfficialRating)}</span>` : '';
-    const badges = rating + renderInfoBadgesHtml(item);
-
-    return items.map(html => `<span class="lg-hero__info-item">${html}</span>`).join('')
-        + (badges ? `<span class="lg-hero__info-item lg-hero__badges">${badges}</span>` : '');
-}
-
-function iconButton(action: string, icon: string, label: string, extraClass = '', extraAttrs = ''): string {
-    const safe = escapeHtml(label);
-    return `<button type="button" class="lg-hero__btn lg-hero__btn--circle focusable ${extraClass}" data-action="${action}" aria-label="${safe}" title="${safe}" ${extraAttrs}><span class="material-icons ${icon}" aria-hidden="true"></span></button>`;
-}
-
-function renderTitle(apiClient: ApiClient, item: BaseItemDto): string {
-    const logoUrl = getLogoUrl(apiClient, item);
-    const title = escapeHtml(item.SeriesName || item.Name || '');
-    const heading = logoUrl ?
-        `<img class="lg-hero__logo" src="${escapeHtml(logoUrl)}" alt="${title}" decoding="async">` :
-        `<span class="lg-hero__title lg-type-display">${title}</span>`;
-    const subtitle = item.SeriesName ? `<span class="lg-hero__subtitle">${escapeHtml(item.Name || '')}</span>` : '';
-    return `<h2 class="lg-hero__heading">${heading}${subtitle}</h2>`;
-}
-
-function renderFavoriteButton(item: BaseItemDto): string {
-    const isFavorite = Boolean(item.UserData?.IsFavorite);
-    const label = globalize.translate(isFavorite ? 'Favorite' : 'AddToFavorites');
-    const icon = isFavorite ? 'favorite' : 'favorite_border';
-    return iconButton('favorite', icon, label, 'lg-hero__fav', `aria-pressed="${isFavorite}"`);
-}
-
-function renderSlide(apiClient: ApiClient, item: BaseItemDto, index: number): string {
-    const progress = getProgressPercent(item);
-    const isResume = progress > 0;
-    const playLabel = escapeHtml(globalize.translate(isResume ? 'ButtonResume' : 'Play'));
-    const infoLabel = escapeHtml(globalize.translate('ButtonInfo'));
-
-    return `<section class="lg-hero__slide" data-index="${index}" data-id="${escapeHtml(item.Id || '')}">
-    <img class="lg-hero__backdrop" alt="" decoding="async"${index === 0 ? ' fetchpriority="high"' : ''}>
-    <div class="lg-hero__content">
-        ${renderTitle(apiClient, item)}
-        <div class="lg-hero__meta">${renderTypeLine(item)}</div>
-        ${item.Overview ? `<p class="lg-hero__overview">${escapeHtml(item.Overview)}</p>` : ''}
-        <div class="lg-hero__info">${renderInfoLine(item)}</div>
-        ${isResume ? `<div class="lg-hero__progress" aria-hidden="true"><span style="width:${progress.toFixed(1)}%"></span></div>` : ''}
-        <div class="lg-hero__actions">
-            <button type="button" class="lg-hero__btn lg-hero__btn--primary focusable" data-action="play"><span class="material-icons play_arrow" aria-hidden="true"></span><span>${playLabel}</span></button>
-            <button type="button" class="lg-hero__btn lg-hero__btn--info focusable" data-action="info">${infoLabel}</button>
-            ${renderFavoriteButton(item)}
-        </div>
-    </div>
-</section>`;
-}
-
-function renderControls(count: number): string {
-    if (count < 2) return '';
-    const dots = Array.from({ length: count }, (_, i) =>
-        `<button type="button" class="lg-hero__dot focusable" data-action="goto" data-index="${i}" aria-label="${i + 1} / ${count}"><span></span></button>`
-    ).join('');
-    return `<div class="lg-hero__controls">
-        ${iconButton('prev', 'chevron_left', globalize.translate('Previous'), 'lg-hero__nav lg-hero__nav--prev')}
-        ${iconButton('next', 'chevron_right', globalize.translate('Next'), 'lg-hero__nav lg-hero__nav--next')}
-        <div class="lg-hero__dots">${dots}</div>
-    </div>`;
+export interface HeroChangeDetail {
+    itemId: string | undefined;
+    backdropUrl: string | undefined;
 }
 
 class Hero implements HeroController {
     private readonly root: HTMLElement;
+    private readonly track: HTMLElement;
     private readonly slides: HTMLElement[];
+    private readonly contents: HTMLElement[];
+    // The committed slide: `anchor` is its unwrapped position (so the spring takes the short way round), `current` its index.
     private current = 0;
+    private anchor = 0;
+    // Live on-screen position in slide units, unwrapped. Every card's transform derives from this one value.
+    private pos = 0;
+    private readonly animator = new SpringAnimator(value => this.onSpringUpdate(value), target => this.settle(target));
+    private crossfade = false;
+    private drag: DragGesture | undefined;
+    private dragging = false;
+    private suppressClick = false;
     private timer: ReturnType<typeof setInterval> | undefined;
     private hovered = false;
     private focused = false;
@@ -232,8 +144,11 @@ class Hero implements HeroController {
         this.root.setAttribute('aria-roledescription', 'carousel');
         this.root.setAttribute('aria-label', globalize.translate('Home'));
         this.root.style.setProperty('--lg-hero-interval', `${AUTO_ADVANCE_MS}ms`);
-        this.root.innerHTML = `<div class="lg-hero__slides">${items.map((item, i) => renderSlide(apiClient, item, i)).join('')}</div>${renderControls(items.length)}`;
+        const slides = items.map((item, i) => renderSlide(apiClient, item, i, items.length)).join('');
+        this.root.innerHTML = `<div class="lg-hero__viewport"><div class="lg-hero__track" aria-live="off">${slides}</div>${renderNav(items.length)}</div>${renderDots(items.length)}`;
+        this.track = this.root.querySelector<HTMLElement>('.lg-hero__track') as HTMLElement;
         this.slides = Array.from(this.root.querySelectorAll<HTMLElement>('.lg-hero__slide'));
+        this.contents = this.slides.map(slide => slide.querySelector<HTMLElement>('.lg-hero__content') as HTMLElement);
     }
 
     setPaused(paused: boolean): void {
@@ -250,23 +165,31 @@ class Hero implements HeroController {
 
     start(): void {
         this.root.addEventListener('click', this.onClick);
-        // TV uses spatial navigation; the focusable pager controls are enough there.
-        if (!layoutManager.tv) this.root.addEventListener('keydown', this.onKeyDown);
+        this.root.addEventListener('keydown', this.onKeyDown);
         this.root.addEventListener('mouseenter', this.onEnter);
         this.root.addEventListener('mouseleave', this.onLeave);
         this.root.addEventListener('focusin', this.onFocusIn);
         this.root.addEventListener('focusout', this.onFocusOut);
+        if (this.slides.length > 1) {
+            this.track.addEventListener('pointerdown', this.onPointerDown);
+            this.track.addEventListener('pointermove', this.onPointerMove);
+            this.track.addEventListener('pointerup', this.onPointerUp);
+            this.track.addEventListener('pointercancel', this.onPointerCancel);
+        }
         document.addEventListener('visibilitychange', this.updateTimer);
         Events.on(document, EventType.THEME_CHANGE, this.onThemeChange);
         Events.on(playbackManager, 'playbackstart', this.onPlaybackStart);
+        this.syncMotionMode();
+        this.render();
         this.markAutofocus();
-        void this.show(0);
+        void this.show(() => 0);
     }
 
     destroy = (): void => {
         if (this.destroyed) return;
         this.destroyed = true;
         this.stopTimer();
+        this.animator.stop();
         this.cancelTrailer();
         Events.off(playbackManager, 'playbackstart', this.onPlaybackStart);
         // Release every pending image wait (clears its timer and listeners).
@@ -277,9 +200,14 @@ class Hero implements HeroController {
         this.root.removeEventListener('mouseleave', this.onLeave);
         this.root.removeEventListener('focusin', this.onFocusIn);
         this.root.removeEventListener('focusout', this.onFocusOut);
+        this.track.removeEventListener('pointerdown', this.onPointerDown);
+        this.track.removeEventListener('pointermove', this.onPointerMove);
+        this.track.removeEventListener('pointerup', this.onPointerUp);
+        this.track.removeEventListener('pointercancel', this.onPointerCancel);
         document.removeEventListener('visibilitychange', this.updateTimer);
         Events.off(document, EventType.THEME_CHANGE, this.onThemeChange);
         this.root.remove();
+        document.dispatchEvent(new CustomEvent<HeroChangeDetail | null>(HERO_CHANGE_EVENT, { detail: null }));
     };
 
     private loadImage(index: number): void {
@@ -319,35 +247,80 @@ class Hero implements HeroController {
         });
     }
 
-    private async show(index: number): Promise<void> {
+    /**
+     * Make the slide chosen by `plan` the active one. `plan` receives the current unwrapped anchor and is
+     * evaluated after the backdrop wait, because the anchor can be re-based while the spring rests.
+     */
+    private async show(plan: (anchor: number) => number, options: ShowOptions = {}): Promise<void> {
         const count = this.slides.length;
-        const target = (index + count) % count;
         // A newer show() supersedes this one; stale awaits are ignored via the token.
         const token = ++this.showToken;
         this.stopTimer();
         this.cancelTrailer();
+        // Polite while a person is navigating; silent while the carousel advances itself.
+        this.track.setAttribute('aria-live', options.user ? 'polite' : 'off');
         // Freeze the progress dot while the next backdrop loads; updateTimer clears this once the slide is shown.
         this.root.classList.add('lg-hero--paused');
-        await this.waitForBackdrop(target, this.hasShown ? IMAGE_TIMEOUT_MS : FIRST_IMAGE_TIMEOUT_MS);
+        if (!options.immediate) {
+            const timeout = this.hasShown ? IMAGE_TIMEOUT_MS : FIRST_IMAGE_TIMEOUT_MS;
+            await this.waitForBackdrop(mod(plan(this.anchor), count), timeout);
+        }
         if (token !== this.showToken || this.destroyed) return;
 
+        this.syncMotionMode();
+        const target = canLoop(count) ? plan(this.anchor) : mod(plan(this.anchor), count);
+        const previous = this.current;
+        const firstShow = !this.hasShown;
         this.hasShown = true;
         this.root.classList.remove('lg-hero--pending');
-        this.current = target;
-        // Preload only the next backdrop so the crossfade never waits on the network.
-        if (count > 1) this.loadImage((this.current + 1) % count);
+        this.anchor = target;
+        this.current = mod(target, count);
+        this.preloadImages();
+        this.applyActiveState();
+        this.moveTo(target, options.velocity, options.damping);
+        if (firstShow || this.current !== previous) this.dispatchChange();
+        this.updateTimer();
+        this.armTrailer();
+        this.markAutofocus();
+    }
+
+    private step(delta: number, user = true): void {
+        void this.show(anchor => anchor + delta, { user });
+    }
+
+    private goToIndex(index: number): void {
+        const count = this.slides.length;
+        void this.show(anchor => anchor + wrapDistance(index - mod(anchor, count), count), { user: true });
+    }
+
+    /** Backdrops are small and few; load them all so the peeking neighbours show artwork, not blanks. */
+    private preloadImages(): void {
+        for (let i = 0; i < this.slides.length; i += 1) this.loadImage(i);
+    }
+
+    private dispatchChange(): void {
+        const item = this.items[this.current];
+        const detail: HeroChangeDetail = { itemId: item?.Id, backdropUrl: item ? getBackdropUrl(this.apiClient, item) : undefined };
+        document.dispatchEvent(new CustomEvent<HeroChangeDetail>(HERO_CHANGE_EVENT, { detail }));
+    }
+
+    /** Mark the centre card active and take every other card out of the accessibility tree, tab order and spatial navigation. */
+    private applyActiveState(): void {
+        const previous = this.slides.find(slide => slide.classList.contains('is-active'));
+        // Focus inside a card that is about to become inert would be dropped by the browser; carry it over instead.
+        const hadFocus = Boolean(previous?.contains(document.activeElement));
 
         this.slides.forEach((slide, i) => {
             const active = i === this.current;
+            const content = this.contents[i];
             slide.classList.toggle('is-active', active);
             slide.setAttribute('aria-hidden', String(!active));
-            // Hidden slides must not hold tab stops or be reachable by remote focus. `inert` is not
-            // supported on old TV browsers, so tabindex and CSS visibility back it up.
-            if (active) slide.removeAttribute('inert');
-            else slide.setAttribute('inert', '');
-            // focusManager's spatial-nav query matches any `.focusable` whatever its tabindex, and hidden
-            // slides overlap the active one, so their controls must drop the class too.
-            slide.querySelectorAll('button, a').forEach(control => {
+            // The copy and controls of a neighbour are inert; the card itself stays clickable to bring it to the centre.
+            // `inert` is not supported on old TV browsers, so tabindex and the focusable class back it up.
+            if (active) content.removeAttribute('inert');
+            else content.setAttribute('inert', '');
+            // focusManager's spatial-nav query matches any `.focusable` whatever its tabindex, so hidden controls drop the class too.
+            content.querySelectorAll('button, a').forEach(control => {
                 control.classList.toggle('focusable', active);
                 if (active) control.removeAttribute('tabindex');
                 else control.setAttribute('tabindex', '-1');
@@ -357,9 +330,157 @@ class Hero implements HeroController {
             if (i === this.current) dot.setAttribute('aria-current', 'true');
             else dot.removeAttribute('aria-current');
         });
+
+        const active = this.slides[this.current];
+        if (hadFocus && previous !== active) {
+            active?.querySelector<HTMLElement>('.lg-hero__btn--primary')?.focus({ preventScroll: true });
+        }
+    }
+
+    // ----- Motion: one position value, a spring, and per-card visuals derived from it -----
+
+    /** Reduced motion swaps sliding for a short cross-fade; the inline transforms are dropped. */
+    private syncMotionMode(): void {
+        const reduced = prefersReducedMotion();
+        if (reduced === this.crossfade) return;
+        this.crossfade = reduced;
+        this.root.classList.toggle('lg-hero--crossfade', reduced);
+        this.animator.stop();
+        this.pos = this.anchor;
+        if (reduced) this.clearInlineStyles();
+        else this.render();
+    }
+
+    private clearInlineStyles(): void {
+        this.slides.forEach((slide, i) => {
+            slide.style.removeProperty('transform');
+            slide.style.removeProperty('opacity');
+            slide.style.removeProperty('z-index');
+            slide.style.removeProperty('pointer-events');
+            this.contents[i].style.removeProperty('opacity');
+        });
+    }
+
+    /** Write every card's transform and opacity from the single position value. */
+    private render(): void {
+        if (this.crossfade) return;
+        const count = this.slides.length;
+        const loop = canLoop(count);
+        this.slides.forEach((slide, i) => {
+            const style = slideStyle(wrapDistance(i - this.pos, count, loop));
+            slide.style.transform = style.transform;
+            slide.style.opacity = style.opacity;
+            slide.style.zIndex = style.zIndex;
+            slide.style.pointerEvents = style.pointerEvents;
+            if (style.contentOpacity === null) this.contents[i].style.removeProperty('opacity');
+            else this.contents[i].style.opacity = style.contentOpacity;
+        });
+    }
+
+    /**
+     * Animate to `target` from the live on-screen value. Without a handed-over velocity the spring keeps
+     * the velocity it already had, so re-targeting mid-flight does not hit a wall.
+     */
+    private moveTo(target: number, velocity?: number, damping = DAMPING_DEFAULT): void {
+        const liveVelocity = this.animator.velocity;
+        this.animator.stop();
+        if (this.crossfade) {
+            this.settle(target);
+            return;
+        }
+        this.animator.start(this.pos, target, velocity ?? liveVelocity, { damping, response: SPRING_RESPONSE_S });
+    }
+
+    private onSpringUpdate(value: number): void {
+        this.pos = value;
+        this.render();
+    }
+
+    /** Land exactly on the target and re-base the unwrapped position so it never grows without bound. */
+    private settle(target: number): void {
+        const count = this.slides.length;
+        const shift = canLoop(count) ? Math.floor(target / count) * count : 0;
+        this.anchor = target - shift;
+        this.pos = this.anchor;
+        this.render();
+    }
+
+    // ----- Pointer: 1:1 drag with a hysteresis threshold, then a projected, velocity-carrying release -----
+
+    private slideStride(): number {
+        const width = this.slides[this.current]?.offsetWidth || FALLBACK_SLIDE_WIDTH_PX;
+        return width * STRIDE_FRACTION + SLIDE_GAP_PX;
+    }
+
+    private readonly onPointerDown = (e: PointerEvent): void => {
+        if (!e.isPrimary || e.button !== 0 || this.destroyed || this.drag?.isDragging) return;
+        this.suppressClick = false;
+        this.syncMotionMode();
+        // Grab the card where it is on screen, even mid-flight.
+        const interrupted = this.animator.running;
+        this.animator.stop();
+        this.drag = new DragGesture(e.pointerId, e.clientX, e.clientY, this.pos, this.slideStride(), interrupted);
+    };
+
+    private readonly onPointerMove = (e: PointerEvent): void => {
+        const drag = this.drag;
+        if (!drag || e.pointerId !== drag.pointerId) return;
+        const update = drag.move(e.clientX, e.clientY, e.timeStamp, this.pos);
+        if (update === 'pending') return;
+        if (update === 'abandon') {
+            // Vertical intent: leave the gesture to page scroll.
+            this.drag = undefined;
+            if (drag.interrupted) this.moveTo(this.anchor);
+            return;
+        }
+        if (update === 'start') this.onDragStart(e.pointerId);
+        this.pos = constrainPosition(drag.positionAt(e.clientX), drag.stride, this.slides.length);
+        this.render();
+    };
+
+    private onDragStart(pointerId: number): void {
+        if (typeof this.track.setPointerCapture === 'function') this.track.setPointerCapture(pointerId);
+        this.dragging = true;
+        this.root.classList.add('lg-hero--dragging');
+        this.cancelTrailer();
         this.updateTimer();
-        this.armTrailer();
-        this.markAutofocus();
+    }
+
+    private readonly onPointerUp = (e: PointerEvent): void => {
+        this.endDrag(e, true);
+    };
+
+    private readonly onPointerCancel = (e: PointerEvent): void => {
+        this.endDrag(e, false);
+    };
+
+    private endDrag(e: PointerEvent, withMomentum: boolean): void {
+        const drag = this.drag;
+        if (!drag || e.pointerId !== drag.pointerId) return;
+        this.drag = undefined;
+        if (!drag.isDragging) {
+            // A plain press: if it caught a moving card, let that card carry on.
+            if (drag.interrupted) this.moveTo(this.anchor);
+            return;
+        }
+
+        if (typeof this.track.hasPointerCapture === 'function' && this.track.hasPointerCapture(e.pointerId)) {
+            this.track.releasePointerCapture(e.pointerId);
+        }
+        this.dragging = false;
+        this.root.classList.remove('lg-hero--dragging');
+        // The click that follows a drag must not press a button or pick a neighbour.
+        this.suppressClick = true;
+
+        const velocity = withMomentum ? drag.releaseVelocity(e.timeStamp) : 0;
+        const offsetPx = (this.anchor - this.pos) * drag.stride;
+        const target = pickSnapIndex(this.anchor, offsetPx, velocity, drag.stride, this.slides.length);
+        void this.show(() => target, {
+            immediate: true,
+            user: true,
+            velocity: -velocity / drag.stride,
+            damping: dampingForRelease(velocity)
+        });
     }
 
     private readonly updateTimer = (): void => {
@@ -367,7 +488,7 @@ class Hero implements HeroController {
         const eligible = this.items.length > 1 && !prefersReducedMotion() && !this.destroyed;
         // document.hidden is universally available on supported browsers; the compat rule is over-strict here.
         // eslint-disable-next-line compat/compat
-        const canRun = eligible && !document.hidden && !this.hovered && !this.focused && !this.paused && !this.trailerHolding;
+        const canRun = eligible && !document.hidden && !this.hovered && !this.focused && !this.paused && !this.trailerHolding && !this.dragging;
         if (canRun) {
             this.root.classList.remove('lg-hero--paused');
             // Removing and re-adding the class after a reflow restarts the CSS progress animation in step with the timer.
@@ -376,7 +497,7 @@ class Hero implements HeroController {
             this.root.getBoundingClientRect();
             this.root.classList.add('lg-hero--running');
             this.timer = setInterval(() => {
-                void this.show(this.current + 1);
+                this.step(1, false);
             }, AUTO_ADVANCE_MS);
         } else if (eligible) {
             // Stopped by hover, focus, hidden page or pause: keep the progress dot where it is.
@@ -391,13 +512,13 @@ class Hero implements HeroController {
         this.timer = undefined;
     }
 
-    /** Arms the active slide's trailer, if the item has one. It starts only after the user stays on the slide. */
+    /** Arms the centre card's trailer, if the item has one. The card is the host, so its radius clips the overlay. */
     private armTrailer(): void {
         this.cancelTrailer();
         const item = this.items[this.current];
         const videoId = item ? getTrailerVideoId(item) : null;
         const host = this.slides[this.current];
-        if (!videoId || !host || this.destroyed || this.paused || document.hidden) return;
+        if (!videoId || !host || this.destroyed || this.paused || this.dragging || document.hidden) return;
         const token = this.trailerToken;
         this.trailer = armTrailerBackdrop({
             host,
@@ -476,30 +597,50 @@ class Hero implements HeroController {
         if (!isLiquidGlass()) this.destroy();
     };
 
+    /** On TV the d-pad moves focus between Play, Info and Favorite first; only past the row's ends does it change slide. */
+    private leavesToSpatialNav(target: HTMLElement | null, direction: number): boolean {
+        if (!layoutManager.tv) return false;
+        const button = target?.closest('.lg-hero__actions > button');
+        if (!button) return false;
+        return Boolean(direction < 0 ? button.previousElementSibling : button.nextElementSibling);
+    }
+
     private readonly onKeyDown = (e: KeyboardEvent): void => {
+        this.suppressClick = false;
         if (this.items.length < 2 || e.altKey || e.ctrlKey || e.metaKey) return;
         if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        // Only the pager and prev/next controls handle arrows; Play/Info/Favorite keep spatial navigation.
-        const target = e.target as HTMLElement | null;
-        if (!target?.closest('.lg-hero__dot, .lg-hero__nav')) return;
+        const direction = e.key === 'ArrowLeft' ? -1 : 1;
+        if (this.leavesToSpatialNav(e.target as HTMLElement | null, direction)) return;
         e.preventDefault();
-        void this.show(this.current + (e.key === 'ArrowLeft' ? -1 : 1));
+        this.step(direction);
     };
 
     private readonly onClick = (e: MouseEvent): void => {
-        const button = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
-        if (!button) return;
+        if (this.suppressClick) {
+            this.suppressClick = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        const target = e.target as HTMLElement;
+        const button = target.closest<HTMLElement>('[data-action]');
+        if (!button) {
+            // A peeking neighbour comes to the centre when tapped.
+            const slide = target.closest<HTMLElement>('.lg-hero__slide');
+            if (slide && !slide.classList.contains('is-active')) this.goToIndex(Number(slide.dataset.index));
+            return;
+        }
         const item = this.items[this.current];
 
         switch (button.dataset.action) {
             case 'prev':
-                void this.show(this.current - 1);
+                this.step(-1);
                 break;
             case 'next':
-                void this.show(this.current + 1);
+                this.step(1);
                 break;
             case 'goto':
-                void this.show(Number(button.dataset.index));
+                this.goToIndex(Number(button.dataset.index));
                 break;
             case 'play':
                 this.cancelTrailer();
@@ -518,10 +659,12 @@ class Hero implements HeroController {
 
     private play(item: BaseItemDto): void {
         if (!item.Id) return;
-        void playbackManager.play({
+        playbackManager.play({
             ids: [item.Id],
             startPositionTicks: getResumeTicks(item),
             serverId: item.ServerId || this.apiClient.serverId()
+        }).catch((error: unknown) => {
+            console.error('[Hero] Playback failed to start', error);
         });
     }
 

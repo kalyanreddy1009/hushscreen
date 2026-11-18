@@ -1,8 +1,8 @@
 {
-    "name": "hushscreen",
+    "name": "HushScreen",
     "description": "A calm, cinematic web client for Jellyfin servers",
     "lang": "en-US",
-    "short_name": "hushscreen",
+    "short_name": "HushScreen",
     "start_url": "index.html#/home",
     "theme_color": "#101010",
     "background_color": "#101010",

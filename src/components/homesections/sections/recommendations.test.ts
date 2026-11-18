@@ -1,5 +1,5 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('../../../lib/globalize', () => ({
     default: {
@@ -22,6 +22,22 @@ vi.mock('../../cardbuilder/cardBuilder', () => ({
     }
 }));
 
+const glassApiClient = vi.hoisted(() => ({
+    getScaledImageUrl: (itemId: string, options: { type: string }) => `https://example.test/${itemId}/${options.type}`
+}));
+
+vi.mock('../../../lib/jellyfin-apiclient', () => ({
+    ServerConnections: { getApiClient: () => glassApiClient }
+}));
+
+vi.mock('../../playback/playbackmanager', () => ({ playbackManager: { play: vi.fn() } }));
+
+vi.mock('../../liquidglass/glassTile', async importOriginal => ({
+    ...await importOriginal<typeof import('../../liquidglass/glassTile')>(),
+    bindGlassTiles: vi.fn(() => vi.fn())
+}));
+
+import { bindGlassTiles } from '../../liquidglass/glassTile';
 import {
     dedupeRows,
     getTopGenres,
@@ -656,5 +672,95 @@ describe('startLatestRequest', () => {
         startLatestRequest(ownerB);
 
         expect(firstA()).toBe(true);
+    });
+});
+
+describe('loadRecommendationRows on Liquid Glass', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+        document.documentElement.setAttribute('data-jf-theme', 'liquidglass');
+        vi.mocked(bindGlassTiles).mockClear();
+        container = document.createElement('div');
+    });
+
+    afterEach(() => {
+        document.documentElement.removeAttribute('data-jf-theme');
+    });
+
+    function rowFor(title: string): RowContainer | undefined {
+        const heading = Array.from(container.querySelectorAll('.lg-rec-section h2')).find(h => h.textContent === title);
+        return heading?.closest('.lg-rec-section')?.querySelector<RowContainer>('.itemsContainer') ?? undefined;
+    }
+
+    it('renders every row as glass tiles, landscape only for Top Picks', async () => {
+        const api = fakeApiClient();
+
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+
+        const sample = movies('x', 1);
+        expect(rowFor('Because You Watched Movie p1')?.getItemsHtml(sample)).toContain('lg-tile--portrait');
+        expect(rowFor('Top Picks for You')?.getItemsHtml(sample)).toContain('lg-tile--landscape');
+        expect(rowFor('Highly Rated, Not Yet Watched')?.getItemsHtml(sample)).toContain('lg-tile--portrait');
+        expect(rowFor('New in Your Genres')?.getItemsHtml(sample)).toContain('lg-tile--portrait');
+        expect(rowFor('New in Your Genres')?.getItemsHtml(sample)).not.toContain('<card');
+    });
+
+    it('marks each row items container so the tiles lay out in one line', async () => {
+        const api = fakeApiClient();
+
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+
+        expect(rowFor('Top Picks for You')?.classList.contains('lg-tiles-row')).toBe(true);
+        expect(rowFor('Highly Rated, Not Yet Watched')?.classList.contains('lg-tiles-row')).toBe(true);
+    });
+
+    it('requests Genres and Overview for every row drawn as tiles and keeps the taste lists unchanged', async () => {
+        const api = fakeApiClient();
+
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+
+        const tileFields = 'PrimaryImageAspectRatio,Genres,Overview';
+        expect(api.getItems).toHaveBeenCalledWith('user1', expect.objectContaining({ IsPlayed: true, Fields: 'Genres' }));
+        expect(api.getItems).toHaveBeenCalledWith('user1', expect.objectContaining({ SortBy: 'CommunityRating,CriticRating', Fields: tileFields }));
+        expect(api.getItems).toHaveBeenCalledWith('user1', expect.objectContaining({ SortBy: 'CriticRating,CommunityRating', Fields: tileFields }));
+        expect(api.getItems).toHaveBeenCalledWith('user1', expect.objectContaining({ SortBy: 'DateCreated', IsPlayed: false, Fields: tileFields }));
+        expect(api.getUrl).toHaveBeenCalledWith('Items/p1/Similar', { userId: 'user1', limit: 20, fields: tileFields });
+    });
+
+    it('binds each row once per render and unbinds the previous wiring on re-render', async () => {
+        const api = fakeApiClient();
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+        const row = rowFor('Highly Rated, Not Yet Watched');
+
+        row?.getItemsHtml(movies('h', 2));
+
+        expect(bindGlassTiles).toHaveBeenCalledTimes(1);
+        expect(bindGlassTiles).toHaveBeenCalledWith(row, api);
+        const firstUnbind = vi.mocked(bindGlassTiles).mock.results[0].value as Mock;
+        expect(firstUnbind).not.toHaveBeenCalled();
+
+        row?.getItemsHtml(movies('h', 3));
+
+        expect(bindGlassTiles).toHaveBeenCalledTimes(2);
+        expect(firstUnbind).toHaveBeenCalledTimes(1);
+        const secondUnbind = vi.mocked(bindGlassTiles).mock.results[1].value as Mock;
+        expect(secondUnbind).not.toHaveBeenCalled();
+    });
+
+    it('keeps the card path and never binds tiles on a stock theme', async () => {
+        document.documentElement.removeAttribute('data-jf-theme');
+        const api = fakeApiClient();
+
+        await loadRecommendationRows(container, api as never, 'user1', { random: keepOrder });
+
+        const row = rowFor('Highly Rated, Not Yet Watched');
+        expect(row?.getItemsHtml(movies('h', 1))).toBe('<card data-id="h1"></card>');
+        expect(row?.classList.contains('lg-tiles-row')).toBe(false);
+        expect(bindGlassTiles).not.toHaveBeenCalled();
+        expect(api.getItems).toHaveBeenCalledWith('user1', expect.objectContaining({
+            SortBy: 'CriticRating,CommunityRating',
+            Fields: 'PrimaryImageAspectRatio'
+        }));
     });
 });

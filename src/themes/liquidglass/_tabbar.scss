@@ -1,5 +1,9 @@
 // tabbar — Floating glass bottom tab bar (src/components/liquidglass/bottomTabBar.ts).
+// Phone: full-width pill inside the gutters. Desktop: compact pill centred at the bottom. Never on TV.
 @use 'mixins' as *;
+
+// Desktop item width: wide enough for the 0.6875rem labels and a 44px+ hit target
+$lg-tabbar-desktop-item-width: 4.5rem;
 
 // Bottom tab bar
 .lg-tabbar {
@@ -8,7 +12,8 @@
     display: none;
 }
 
-.layout-mobile {
+.layout-mobile,
+.layout-desktop {
     // Page content must clear the floating bar
     &.lg-has-tabbar body {
         padding-bottom: calc(#{$lg-tabbar-height} + var(--lg-space-4) + env(safe-area-inset-bottom));
@@ -51,11 +56,19 @@
         text-decoration: none;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
+        transition:
+            transform var(--lg-dur-micro) var(--lg-ease-out),
+            background-color var(--lg-dur-micro) var(--lg-ease-out),
+            color var(--lg-dur-micro) var(--lg-ease-out);
 
         &[aria-current='page'] {
             background: var(--lg-accent-soft);
             color: var(--lg-accent-text);
             font-weight: 600;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
         }
     }
 
@@ -69,4 +82,17 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+}
+
+// Desktop: a compact pill centred at the bottom edge
+.layout-desktop .lg-tabbar:not([hidden]) {
+    right: auto;
+    left: 50%;
+    width: fit-content;
+    transform: translateX(-50%);
+}
+
+.layout-desktop .lg-tabbar-item {
+    flex: 0 0 auto;
+    width: $lg-tabbar-desktop-item-width;
 }

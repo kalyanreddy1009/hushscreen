@@ -14,24 +14,137 @@
     }
 }
 
+// Splash: shown before any JS or theme loads, so it is self-contained and theme independent. The lockup
+// markup is generated into index.html by scripts/brand/render_brand.mjs; the animation matches
+// themes/liquidglass/_brand.scss (same keyframe names). Only transform and opacity animate; plays once.
 .splashLogo {
-    animation: fadein 0.5s;
-    width: 30%;
-    height: 30%;
-    background-image: url(../assets/img/brand/icon-transparent.png);
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: contain;
+    --hs-splash: min(26vw, 160px);
+
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 55%, #2e2723 0%, #1a1613 70%);
+    color: #f3ede4;
+
+    .hs-lockup {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .hs-mark {
+        flex: none;
+        width: var(--hs-splash);
+        height: var(--hs-splash);
+        margin: 0 calc(var(--hs-splash) * -0.2);
+        overflow: visible;
+    }
+
+    .hs-wordmark {
+        margin-inline-start: calc(var(--hs-splash) * 0.06);
+        font-family: 'Noto Sans', system-ui, sans-serif;
+        font-size: calc(var(--hs-splash) * 0.443);
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .hs-slab-l {
+        transform-origin: 208px 256px;
+    }
+
+    .hs-slab-r {
+        transform-origin: 304px 256px;
+    }
+
+    .hs-glow {
+        transform-origin: 256px 404px;
+    }
+
+    .hs-pool {
+        transform-origin: 256px 432px;
+    }
+
+    .hs-animate {
+        .hs-slab {
+            animation: hs-open 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .hs-lintel {
+            animation: hs-fade 450ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
+        }
+
+        .hs-light-fx {
+            animation: hs-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both;
+        }
+
+        .hs-rim {
+            animation: hs-fade 700ms cubic-bezier(0.22, 1, 0.36, 1) 600ms both;
+        }
+
+        .hs-wordmark {
+            animation: hs-word 700ms cubic-bezier(0.22, 1, 0.36, 1) 600ms both;
+        }
+    }
 }
 
-@media screen
-    and (min-device-width: 992px) {
-    .splashLogo {
-        background-image: url(../assets/img/brand/banner-light.png);
+@keyframes hs-open {
+    from {
+        opacity: 0;
+        transform: scaleX(0.55);
+    }
+
+    to {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+@keyframes hs-rise {
+    from {
+        opacity: 0;
+        transform: scaleY(0.6);
+    }
+
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+@keyframes hs-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes hs-word {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .splashLogo .hs-animate {
+        .hs-slab,
+        .hs-lintel,
+        .hs-light-fx,
+        .hs-rim,
+        .hs-wordmark {
+            animation: hs-fade 200ms linear both;
+        }
     }
 }
 

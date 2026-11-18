@@ -6,12 +6,15 @@ import escapeHtml from 'escape-html';
 import type { ApiClient } from 'jellyfin-apiclient';
 
 import cardBuilder from 'components/cardbuilder/cardBuilder';
+import type { GlassTileShape } from 'components/liquidglass/glassTile';
 import layoutManager from 'components/layoutManager';
 import { appRouter } from 'components/router/appRouter';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
+import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
 import { getBackdropShape, getPortraitShape, getSquareShape } from 'utils/card';
 
+import { renderGlassRow, withGlassTileFields } from './recommendations';
 import type { SectionContainerElement, SectionOptions } from './section';
 
 function getFetchLatestItemsFn(
@@ -38,7 +41,7 @@ function getFetchLatestItemsFn(
 
         const options = {
             Limit: limit,
-            Fields: 'PrimaryImageAspectRatio,Path',
+            Fields: withGlassTileFields('PrimaryImageAspectRatio,Path'),
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Thumb',
             ParentId: parentId
@@ -46,6 +49,12 @@ function getFetchLatestItemsFn(
 
         return apiClient.getLatestItems(options);
     };
+}
+
+/** Glass tiles are portrait for poster libraries and landscape for everything else (square art is shown landscape). */
+function getGlassShape(itemType: BaseItemKind | undefined, viewType: string | null | undefined): GlassTileShape {
+    const isPoster = itemType === 'Channel' || viewType === 'movies' || viewType === 'books' || viewType === 'tvshows';
+    return isPoster ? 'portrait' : 'landscape';
 }
 
 function getLatestItemsHtmlFn(
@@ -108,14 +117,16 @@ function renderLatestSection(
     }
     html += '</div>';
 
-    if (options.enableOverflow) {
+    // Glass tiles lay out in one horizontal line, so they always sit in the scroller.
+    const scrollable = options.enableOverflow || isLiquidGlass();
+    if (scrollable) {
         html += '<div is="emby-scroller" class="padded-top-focusscale padded-bottom-focusscale" data-centerfocus="true">';
         html += '<div is="emby-itemscontainer" class="itemsContainer scrollSlider focuscontainer-x">';
     } else {
         html += '<div is="emby-itemscontainer" class="itemsContainer focuscontainer-x padded-left padded-right vertical-wrap">';
     }
 
-    if (options.enableOverflow) {
+    if (scrollable) {
         html += '</div>';
     }
     html += '</div>';
@@ -125,7 +136,17 @@ function renderLatestSection(
     const itemsContainer: SectionContainerElement | null = elem.querySelector('.itemsContainer');
     if (!itemsContainer) return;
     itemsContainer.fetchData = getFetchLatestItemsFn(apiClient.serverId(), parent.Id, parent.CollectionType, options);
-    itemsContainer.getItemsHtml = getLatestItemsHtmlFn(parent.Type, parent.CollectionType, options);
+    if (isLiquidGlass()) {
+        itemsContainer.classList.add('lg-tiles-row');
+        itemsContainer.getItemsHtml = items => renderGlassRow(
+            itemsContainer,
+            apiClient,
+            items,
+            getGlassShape(parent.Type, parent.CollectionType)
+        );
+    } else {
+        itemsContainer.getItemsHtml = getLatestItemsHtmlFn(parent.Type, parent.CollectionType, options);
+    }
     itemsContainer.parentContainer = elem;
 }
 

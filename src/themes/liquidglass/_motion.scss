@@ -76,17 +76,6 @@ $stagger-count: 12;
     to { transform: scaleX(1); }
 }
 
-@keyframes lg-hero-parallax {
-    to { translate: 0 22%; }
-}
-
-@keyframes lg-hero-content-out {
-    to {
-        opacity: 0;
-        translate: 0 -32px;
-    }
-}
-
 @keyframes lg-reveal {
     from {
         opacity: 0;
@@ -141,8 +130,13 @@ $stagger-count: 12;
     // -----------------------------------------------------------------------
     // 4. Home hero cinematics
     // -----------------------------------------------------------------------
-    // Ken Burns: each slide's art eases from a slight zoom to rest while it is on screen. A transition
-    // (not a keyframe) so the outgoing slide eases back from wherever it is instead of snapping.
+    // The hero is a card carousel: hero.ts writes `transform` and `opacity` on each .lg-hero__slide (the card)
+    // and `opacity` on its .lg-hero__content. Everything below lands on inner elements (the image's `scale`,
+    // the copy's children), never on the card, so no two systems write the same property on one element.
+    //
+    // Ken Burns: the art inside the card eases from a slight zoom to rest while its card is centred. A transition
+    // (not a keyframe) so the outgoing card eases back from wherever it is instead of snapping. The drift is
+    // under 1% per second, so it stays imperceptible while a drag is in progress.
     .lg-hero__backdrop {
         scale: 1.07;
         transition: scale calc(var(--lg-hero-interval, 8000ms) + 2000ms) linear;
@@ -208,7 +202,10 @@ $stagger-count: 12;
         .detailButton,
         .lg-hero__btn,
         .lg-tabbar-item {
-            transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
+            transition:
+                transform var(--lg-dur-spring) var(--lg-ease-spring),
+                background-color var(--lg-dur-micro) var(--lg-ease-out),
+                color var(--lg-dur-micro) var(--lg-ease-out);
         }
 
         // Press feedback stays fast even though the hover swell uses the spring
@@ -282,22 +279,10 @@ $stagger-count: 12;
 // ---------------------------------------------------------------------------
 // 9. Scroll-driven depth (Chromium 115+, Safari 26+; skipped elsewhere)
 // ---------------------------------------------------------------------------
+// No hero rules here: the hero is a bounded card that scrolls with the page, so parallax would expose the
+// card's background and lifting the copy off the card would detach it from its artwork.
 @supports (animation-timeline: scroll()) {
     @media (prefers-reduced-motion: no-preference) {
-        // Hero art drifts slower than the page and the copy lifts away as you scroll past it.
-        // `translate` composes with the Ken Burns `scale`; the slide's bottom gradient stays put.
-        .lg-hero__backdrop {
-            animation: lg-hero-parallax linear both;
-            animation-timeline: scroll(root block);
-            animation-range: 0 100vh;
-        }
-
-        .lg-hero__content {
-            animation: lg-hero-content-out linear both;
-            animation-timeline: scroll(root block);
-            animation-range: 0 60vh;
-        }
-
         // Library grids and lists reveal as they scroll into view (replaces the timed cascade there)
         .itemsContainer.vertical-wrap > .card,
         .itemsContainer.vertical-list > .listItem {

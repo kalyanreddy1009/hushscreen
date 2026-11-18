@@ -7,8 +7,10 @@ import { appRouter } from 'components/router/appRouter';
 import globalize from 'lib/globalize';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import type { UserSettings } from 'scripts/settings/userSettings';
+import { isLiquidGlass } from 'themes/liquidglass/isLiquidGlass';
 import { getBackdropShape } from 'utils/card';
 
+import { renderGlassRow, withGlassTileFields } from './recommendations';
 import type { SectionContainerElement, SectionOptions } from './section';
 
 function getNextUpFetchFn(
@@ -22,7 +24,7 @@ function getNextUpFetchFn(
         oldestDateForNextUp.setDate(oldestDateForNextUp.getDate() - userSettings.maxDaysForNextUp());
         return apiClient.getNextUpEpisodes({
             Limit: enableOverflow ? 24 : 15,
-            Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount',
+            Fields: withGlassTileFields('PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount'),
             UserId: apiClient.getCurrentUserId(),
             ImageTypeLimit: 1,
             EnableImageTypes: 'Primary,Backdrop,Banner,Thumb',
@@ -66,6 +68,8 @@ export function loadNextUp(
     options: SectionOptions
 ) {
     let html = '';
+    // Glass tiles lay out in one horizontal line, so they always sit in the scroller.
+    const scrollable = options.enableOverflow || isLiquidGlass();
 
     html += '<div class="sectionTitleContainer sectionTitleContainer-cards padded-left">';
     if (!layoutManager.tv) {
@@ -84,14 +88,14 @@ export function loadNextUp(
     }
     html += '</div>';
 
-    if (options.enableOverflow) {
+    if (scrollable) {
         html += '<div is="emby-scroller" class="padded-top-focusscale padded-bottom-focusscale" data-centerfocus="true">';
         html += '<div is="emby-itemscontainer" class="itemsContainer scrollSlider focuscontainer-x" data-monitor="videoplayback,markplayed">';
     } else {
         html += '<div is="emby-itemscontainer" class="itemsContainer padded-left padded-right vertical-wrap focuscontainer-x" data-monitor="videoplayback,markplayed">';
     }
 
-    if (options.enableOverflow) {
+    if (scrollable) {
         html += '</div>';
     }
     html += '</div>';
@@ -102,6 +106,11 @@ export function loadNextUp(
     const itemsContainer: SectionContainerElement | null = elem.querySelector('.itemsContainer');
     if (!itemsContainer) return;
     itemsContainer.fetchData = getNextUpFetchFn(apiClient.serverId(), userSettings, options);
-    itemsContainer.getItemsHtml = getNextUpItemsHtmlFn(userSettings.useEpisodeImagesInNextUpAndResume(), options);
+    if (isLiquidGlass()) {
+        itemsContainer.classList.add('lg-tiles-row');
+        itemsContainer.getItemsHtml = items => renderGlassRow(itemsContainer, apiClient, items, 'landscape');
+    } else {
+        itemsContainer.getItemsHtml = getNextUpItemsHtmlFn(userSettings.useEpisodeImagesInNextUpAndResume(), options);
+    }
     itemsContainer.parentContainer = elem;
 }

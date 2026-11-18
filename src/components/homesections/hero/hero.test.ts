@@ -1,8 +1,9 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const play = vi.hoisted(() => vi.fn());
+const play = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 const showItem = vi.hoisted(() => vi.fn());
+const motion = vi.hoisted(() => ({ reduced: false }));
 const arm = vi.hoisted(() => vi.fn<(options: unknown) => { cancel: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; playing: boolean }>(() => ({ cancel: vi.fn(), destroy: vi.fn(), playing: false })));
 
 vi.mock('../../playback/playbackmanager', () => ({ playbackManager: { play } }));
@@ -18,7 +19,7 @@ vi.mock('../../mediainfo/mediainfo', () => ({
 vi.mock('../../../lib/globalize', () => ({ default: { translate: (key: string) => key } }));
 vi.mock('../../../themes/liquidglass/isLiquidGlass', () => ({
     isLiquidGlass: () => true,
-    prefersReducedMotion: () => false
+    prefersReducedMotion: () => motion.reduced
 }));
 
 import layoutManager from '../../layoutManager';
@@ -72,6 +73,7 @@ describe('hero', () => {
         container.remove();
         vi.useRealTimers();
         vi.clearAllMocks();
+        motion.reduced = false;
     });
 
     it('renders nothing with zero items', async () => {
@@ -546,5 +548,369 @@ describe('hero trailer and TV focus', () => {
         await flush();
 
         expect(container.querySelector('[autofocus]')).toBeNull();
+    });
+});
+
+describe('hero carousel', () => {
+    const SLIDE_WIDTH_PX = 800;
+    const AUTO_ADVANCE_MS = 8000;
+    const TRAILER_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+    type Change = { itemId: string; backdropUrl: string } | null;
+    let container: HTMLElement;
+    let changes: Change[];
+
+    const recordChange = (event: Event): void => {
+        changes.push((event as CustomEvent<Change>).detail);
+    };
+
+    function slides(): HTMLElement[] {
+        return Array.from(container.querySelectorAll<HTMLElement>('.lg-hero__slide'));
+    }
+
+    function activeId(): string | undefined {
+        return container.querySelector<HTMLElement>('.lg-hero__slide.is-active')?.dataset.id;
+    }
+
+    function activeControl(action: string): HTMLElement {
+        const control = container.querySelector<HTMLElement>(`.lg-hero__slide.is-active [data-action="${action}"]`);
+        if (!control) throw new Error(`no active ${action} control`);
+        return control;
+    }
+
+    function key(target: Element, name: string): void {
+        target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
+    }
+
+    function clickAction(action: string, index?: number): void {
+        const selector = index === undefined ? `[data-action="${action}"]` : `[data-action="${action}"][data-index="${index}"]`;
+        container.querySelector<HTMLElement>(selector)?.click();
+    }
+
+    let clock = 0;
+    function pointer(type: string, x: number, y: number, time: number): void {
+        const event = new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        Object.defineProperty(event, 'isPrimary', { value: true });
+        Object.defineProperty(event, 'timeStamp', { value: time });
+        container.querySelector('.lg-hero__track')?.dispatchEvent(event);
+    }
+
+    /** A press, eight moves 40ms apart (about 1.2k px/s for 400px), and a release while the pointer is still moving. */
+    function swipe(fromX: number, toX: number, fromY = 0, toY = 0): void {
+        const steps = 8;
+        clock += 1000;
+        pointer('pointerdown', fromX, fromY, clock);
+        for (let i = 1; i <= steps; i += 1) {
+            clock += 40;
+            pointer('pointermove', fromX + ((toX - fromX) * i) / steps, fromY + ((toY - fromY) * i) / steps, clock);
+        }
+        pointer('pointerup', toX, toY, clock);
+    }
+
+    async function mountReady(ids: string[], extras: Array<Partial<BaseItemDto>> = []): Promise<void> {
+        await mountHero(container, makeClient(ids.map((id, i) => makeItem(id, extras[i]))));
+        await flush();
+    }
+
+    async function mountWithFakeTimers(ids: string[]): Promise<void> {
+        vi.useFakeTimers({ toFake: [ 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame' ] });
+        const mounted = mountHero(container, makeClient(ids.map(id => makeItem(id))));
+        await vi.advanceTimersByTimeAsync(0);
+        await mounted;
+        await vi.advanceTimersByTimeAsync(1500);
+    }
+
+    beforeEach(() => {
+        container = document.createElement('div');
+        document.body.append(container);
+        changes = [];
+        document.addEventListener('lg:herochange', recordChange);
+        Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: () => Promise.resolve() });
+        Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => SLIDE_WIDTH_PX });
+        layoutManager.tv = false;
+    });
+
+    afterEach(() => {
+        destroyHero(container);
+        container.remove();
+        document.removeEventListener('lg:herochange', recordChange);
+        Reflect.deleteProperty(HTMLImageElement.prototype, 'decode');
+        Reflect.deleteProperty(HTMLElement.prototype, 'offsetWidth');
+        motion.reduced = false;
+        layoutManager.tv = false;
+        vi.useRealTimers();
+        vi.clearAllMocks();
+    });
+
+    describe('lg:herochange', () => {
+        it('fires on the first show with the item id and the backdrop URL the slide uses', async () => {
+            await mountReady([ 'a', 'b' ]);
+
+            expect(changes).toEqual([{ itemId: 'a', backdropUrl: '/img/a' }]);
+            expect(container.querySelector('.lg-hero__slide.is-active .lg-hero__backdrop')?.getAttribute('src')).toBe('/img/a');
+        });
+
+        it('fires on every slide change, and not when the same slide is chosen again', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            clickAction('next');
+            await flush();
+            clickAction('goto', 1);
+            await flush();
+            clickAction('prev');
+            await flush();
+
+            expect(changes.map(change => change?.itemId)).toEqual([ 'a', 'b', 'a' ]);
+        });
+
+        it('fires with a null detail when the hero is removed, once', async () => {
+            await mountReady([ 'a', 'b' ]);
+            destroyHero(container);
+            destroyHero(container);
+
+            expect(changes).toHaveLength(2);
+            expect(changes[1]).toBeNull();
+        });
+    });
+
+    describe('keyboard and neighbours', () => {
+        it('ArrowRight and ArrowLeft inside the hero change the slide, wrapping round', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+
+            key(activeControl('play'), 'ArrowRight');
+            await flush();
+            expect(activeId()).toBe('b');
+
+            key(activeControl('play'), 'ArrowLeft');
+            await flush();
+            expect(activeId()).toBe('a');
+
+            key(activeControl('play'), 'ArrowLeft');
+            await flush();
+            expect(activeId()).toBe('c');
+        });
+
+        it('keeps keyboard focus in the hero when the focused slide changes', async () => {
+            await mountReady([ 'a', 'b' ]);
+            const playButton = activeControl('play');
+            playButton.focus();
+            key(playButton, 'ArrowRight');
+            await flush();
+
+            expect(activeId()).toBe('b');
+            expect(document.activeElement).toBe(activeControl('play'));
+        });
+
+        it('on TV, arrows move between Play, Info and Favorite and only change slide past the row ends', async () => {
+            layoutManager.tv = true;
+            await mountReady([ 'a', 'b' ]);
+
+            key(activeControl('play'), 'ArrowRight');
+            await flush();
+            expect(activeId()).toBe('a');
+
+            key(activeControl('favorite'), 'ArrowRight');
+            await flush();
+            expect(activeId()).toBe('b');
+        });
+
+        it('brings a clicked neighbour to the centre', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            const neighbour = slides()[2];
+            expect(neighbour.classList.contains('is-active')).toBe(false);
+            neighbour.click();
+            await flush();
+
+            expect(activeId()).toBe('c');
+        });
+
+        it('makes neighbours aria-hidden with inert, unfocusable controls, and leaves the centre slide reachable', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            const [ centre, ...others ] = slides();
+
+            expect(centre.getAttribute('aria-hidden')).toBe('false');
+            expect(centre.querySelector('.lg-hero__content')?.hasAttribute('inert')).toBe(false);
+            expect(others).toHaveLength(2);
+            for (const neighbour of others) {
+                expect(neighbour.getAttribute('aria-hidden')).toBe('true');
+                expect(neighbour.querySelector('.lg-hero__content')?.hasAttribute('inert')).toBe(true);
+                for (const control of neighbour.querySelectorAll('button, a')) {
+                    expect(control.getAttribute('tabindex')).toBe('-1');
+                    expect(control.classList.contains('focusable')).toBe(false);
+                }
+            }
+        });
+
+        it('labels the carousel, each slide, and marks the current dot', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            const hero = container.querySelector('.lg-hero');
+
+            expect(hero?.getAttribute('aria-roledescription')).toBe('carousel');
+            expect(slides().map(slide => slide.getAttribute('aria-label'))).toEqual([ '1 / 3', '2 / 3', '3 / 3' ]);
+            expect(slides().every(slide => slide.getAttribute('role') === 'group' && slide.getAttribute('aria-roledescription') === 'slide')).toBe(true);
+            const dots = Array.from(container.querySelectorAll('.lg-hero__dot'));
+            expect(dots.map(dot => dot.getAttribute('aria-label'))).toEqual([ '1 / 3', '2 / 3', '3 / 3' ]);
+            expect(dots.map(dot => dot.getAttribute('aria-current'))).toEqual([ 'true', null, null ]);
+        });
+
+        it('announces politely after a person navigates and stays silent on auto-advance', async () => {
+            await mountWithFakeTimers([ 'a', 'b', 'c' ]);
+            const track = container.querySelector('.lg-hero__track');
+            expect(track?.getAttribute('aria-live')).toBe('off');
+
+            await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS);
+            expect(activeId()).toBe('b');
+            expect(track?.getAttribute('aria-live')).toBe('off');
+
+            clickAction('next');
+            await vi.advanceTimersByTimeAsync(100);
+            expect(track?.getAttribute('aria-live')).toBe('polite');
+        });
+    });
+
+    describe('trailer', () => {
+        const trailer = { RemoteTrailers: [{ Url: TRAILER_URL }] };
+
+        it('is armed only on the centre slide, with that slide as host', async () => {
+            await mountReady([ 'a', 'b', 'c' ], [ trailer, trailer, trailer ]);
+
+            expect(arm).toHaveBeenCalledTimes(1);
+            expect((arm.mock.calls[0][0] as ArmOptions).host).toBe(slides()[0]);
+        });
+
+        it('is cancelled on every slide change and re-armed on the new centre slide', async () => {
+            await mountReady([ 'a', 'b' ], [ trailer, trailer ]);
+            const first = arm.mock.results[0].value;
+            clickAction('next');
+            await flush();
+
+            expect(first.cancel).toHaveBeenCalled();
+            expect(arm).toHaveBeenCalledTimes(2);
+            expect((arm.mock.calls[1][0] as ArmOptions).host).toBe(slides()[1]);
+        });
+
+        it('is cancelled when a drag starts, not before the threshold', async () => {
+            await mountReady([ 'a', 'b', 'c' ], [ trailer, trailer, trailer ]);
+            const first = arm.mock.results[0].value;
+            clock += 1000;
+            pointer('pointerdown', 400, 0, clock);
+            pointer('pointermove', 395, 0, clock + 8);
+            expect(first.cancel).not.toHaveBeenCalled();
+
+            pointer('pointermove', 300, 0, clock + 16);
+            expect(first.cancel).toHaveBeenCalled();
+            expect(container.querySelector('.lg-hero--dragging')).not.toBeNull();
+        });
+    });
+
+    describe('drag', () => {
+        it('moves to the next slide after a quick leftward swipe, positioning every card from one value', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            swipe(700, 300);
+            await flush();
+
+            expect(activeId()).toBe('b');
+            expect(container.querySelector('.lg-hero--dragging')).toBeNull();
+            const transforms = slides().map(slide => slide.style.transform);
+            expect(transforms.every(transform => transform.includes('translate3d'))).toBe(true);
+            expect(new Set(transforms).size).toBe(3);
+        });
+
+        it('goes back after a rightward swipe, wrapping to the last slide', async () => {
+            await mountReady([ 'a', 'b', 'c' ]);
+            swipe(300, 700);
+            await flush();
+
+            expect(activeId()).toBe('c');
+        });
+
+        it('stays on the slide for a tiny movement and still lets the click through', async () => {
+            await mountReady([ 'a', 'b' ]);
+            swipe(500, 495);
+            await flush();
+            activeControl('play').click();
+
+            expect(activeId()).toBe('a');
+            expect(play).toHaveBeenCalledTimes(1);
+        });
+
+        it('leaves a mostly vertical gesture to page scroll', async () => {
+            await mountReady([ 'a', 'b' ]);
+            swipe(500, 440, 0, 200);
+            await flush();
+
+            expect(activeId()).toBe('a');
+            expect(container.querySelector('.lg-hero--dragging')).toBeNull();
+        });
+
+        it('swallows the click that ends a drag', async () => {
+            await mountReady([ 'a', 'b' ]);
+            swipe(700, 300);
+            await flush();
+            container.querySelector<HTMLElement>('[data-action="play"]')?.click();
+
+            expect(play).not.toHaveBeenCalled();
+        });
+
+        it('pauses auto-advance while dragging', async () => {
+            await mountWithFakeTimers([ 'a', 'b', 'c' ]);
+            pointer('pointerdown', 700, 0, 1);
+            pointer('pointermove', 650, 0, 9);
+            await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS * 2);
+
+            expect(activeId()).toBe('a');
+            expect(container.querySelector('.lg-hero')?.classList.contains('lg-hero--paused')).toBe(true);
+        });
+
+        it('lets the spring settle every card on a whole position', async () => {
+            await mountWithFakeTimers([ 'a', 'b', 'c' ]);
+            clickAction('next');
+            await vi.advanceTimersByTimeAsync(3000);
+
+            const [ first, second, third ] = slides();
+            expect(second.style.transform).toBe('translate3d(-50%, 0, 0) translate3d(0px, 0, 0) scale(1)');
+            expect(second.style.opacity).toBe('1');
+            expect(first.style.transform).toContain('scale(0.86)');
+            expect(first.style.opacity).toBe('0.5');
+            expect(third.style.opacity).toBe('0.5');
+        });
+    });
+
+    describe('reduced motion', () => {
+        it('cross-fades with no inline transforms and no sliding', async () => {
+            motion.reduced = true;
+            await mountReady([ 'a', 'b', 'c' ]);
+
+            expect(container.querySelector('.lg-hero')?.classList.contains('lg-hero--crossfade')).toBe(true);
+            expect(slides().every(slide => slide.style.transform === '')).toBe(true);
+
+            clickAction('next');
+            await flush();
+            expect(activeId()).toBe('b');
+            expect(slides().every(slide => slide.style.transform === '' && slide.style.opacity === '')).toBe(true);
+        });
+
+        it('keeps auto-advance off', async () => {
+            motion.reduced = true;
+            await mountWithFakeTimers([ 'a', 'b' ]);
+            await vi.advanceTimersByTimeAsync(AUTO_ADVANCE_MS * 2);
+
+            expect(activeId()).toBe('a');
+        });
+
+        it('treats a swipe as a plain slide change', async () => {
+            motion.reduced = true;
+            await mountReady([ 'a', 'b', 'c' ]);
+            swipe(700, 300);
+            await flush();
+
+            expect(activeId()).toBe('b');
+            expect(slides().every(slide => slide.style.transform === '')).toBe(true);
+        });
+
+        it('does not use the cross-fade class in normal mode', async () => {
+            await mountReady([ 'a', 'b' ]);
+
+            expect(container.querySelector('.lg-hero')?.classList.contains('lg-hero--crossfade')).toBe(false);
+        });
     });
 });

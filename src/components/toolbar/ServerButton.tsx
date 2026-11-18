@@ -30,7 +30,7 @@ const ServerButton: FC = () => {
             component={Link}
             to='/'
         >
-            {isPending ? '' : (systemInfo?.ServerName || 'hushscreen')}
+            {isPending ? '' : (systemInfo?.ServerName || 'HushScreen')}
         </Button>
     );
 };

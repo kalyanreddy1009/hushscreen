@@ -5,6 +5,7 @@
 
 $tv-focus-scale: 1.1; // tvOS lift for cards and details buttons
 $tv-hero-btn-scale: 1.08;
+$tv-hero-card-max: 1200px;
 $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
 
 // ---------------------------------------------------------------------------
@@ -43,19 +44,28 @@ $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
 }
 
 // ---------------------------------------------------------------------------
-// 2. Full-bleed hero (home), first row peeks below it, hero buttons lift on focus
+// 2. Hero carousel (home): wider centred card with the neighbours peeking, buttons lift on focus
 // ---------------------------------------------------------------------------
-// Same reason as the desktop rule in _hero.scss: the artwork runs under the transparent header.
-.layout-tv #indexPage.homePage:has(.pageTabContent.is-active .lg-hero) {
-    padding-top: 0 !important;
-}
-
+// The header is a transparent scrim on TV; the carousel sits below it, so the stock page padding stays.
+// Card width for 10 feet. Beats the phone-width override in _hero.scss through the extra class.
 .layout-tv .lg-hero {
-    --lg-hero-height: 82vh;
+    --lg-hero-card-w: min(64vw, #{$tv-hero-card-max});
+    --lg-hero-card-h: max(calc(var(--lg-hero-card-w) * 0.4375), 24rem);
 }
 
+// Copy sizes for reading from a sofa
 .layout-tv .lg-hero__content {
-    padding-bottom: var(--lg-space-6);
+    gap: var(--lg-space-4);
+    width: min(100%, 52rem);
+}
+
+.layout-tv .lg-hero__overview {
+    font-size: var(--lg-type-body);
+}
+
+// Prev/next have no hover on a remote: always visible, and the cards stay reachable by D-pad
+.layout-tv .lg-hero__nav {
+    opacity: 1;
 }
 
 .layout-tv .lg-hero__btn {
@@ -77,11 +87,9 @@ $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
     }
 }
 
-// Focus: scale + glow replace the outline ring. The primary button keeps its accent fill.
+// Focus: scale + glow on top of the focus ring from the focus-ring mixin. The primary button keeps its accent fill.
 .layout-tv .lg-hero__btn:focus:not(:active) {
     transform: scale($tv-hero-btn-scale);
-    outline: none;
-    box-shadow: none;
 }
 
 .layout-tv .lg-hero__btn:focus:not(:active)::after {
@@ -183,6 +191,11 @@ html.layout-tv .card:focus .cardFooter {
 // 9. Reduced motion: keep the focus scale and state change, make them instant
 // ---------------------------------------------------------------------------
 @media (prefers-reduced-motion: reduce) {
+    // Focus shows as the ring and glow only; no scale
+    .layout-tv .lg-hero__btn:focus:not(:active) {
+        transform: none;
+    }
+
     html.layout-tv .card .cardBox,
     html.layout-tv .card .cardScalable,
     html.layout-tv .card .cardFooter {

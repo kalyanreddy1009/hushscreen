@@ -1,68 +1,141 @@
+import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
+import { CollectionType } from '@jellyfin/sdk/lib/generated-client/models/collection-type';
 import { EventType } from '../../constants/eventType';
 import globalize from '../../lib/globalize';
+import { ServerConnections } from '../../lib/jellyfin-apiclient';
 import Events from '../../utils/events';
 import layoutManager from '../../components/layoutManager';
 
 import { isLiquidGlass } from '../../themes/liquidglass/isLiquidGlass';
 
-export type TabId = 'home' | 'search' | 'favorites' | 'libraries' | 'profile';
+export type LibraryKind = 'movies' | 'shows';
+export type TabId = 'home' | LibraryKind | 'favorites';
 
 interface TabDef {
     id: TabId
     icon: string
     labelKey: string
-    /** Hash route; absent for the item that opens the library drawer. */
+    /** Fixed hash route. */
     href?: string
+    /** Resolved from the user's libraries of this kind (see buildTargets). */
+    library?: LibraryKind
 }
 
 export const TABS: readonly TabDef[] = [
     { id: 'home', icon: 'home', labelKey: 'Home', href: '#/home' },
-    { id: 'search', icon: 'search', labelKey: 'Search', href: '#/search' },
+    { id: 'movies', icon: 'movie', labelKey: 'Movies', library: 'movies' },
+    { id: 'shows', icon: 'tv', labelKey: 'Shows', library: 'shows' },
     // The stable home view has two tabs: 0 = Home, 1 = Favorites (controllers/home.js)
-    { id: 'favorites', icon: 'favorite', labelKey: 'Favorites', href: '#/home?tab=1' },
-    // No route: opens the main nav drawer, which lists the user's libraries
-    { id: 'libraries', icon: 'video_library', labelKey: 'HeaderLibraries' },
-    { id: 'profile', icon: 'account_circle', labelKey: 'Profile', href: '#/mypreferencesmenu' }
+    { id: 'favorites', icon: 'favorite', labelKey: 'Favorites', href: '#/home?tab=1' }
 ];
 
-const LIBRARY_ROUTES = [ 'movies', 'tv', 'music', 'livetv', 'list', 'books', 'homevideos', 'musicvideos', 'mixed' ];
+export interface LibraryTarget {
+    /** Where the Movies or Shows tab links. */
+    href: string
+    /** Ids of every library of this kind. A library page for any of them keeps the tab active. */
+    libraryIds: readonly string[]
+}
+
+export type TabTargets = Readonly<Record<LibraryKind, LibraryTarget>>;
+
+const HOME_TARGET: LibraryTarget = { href: '#/home', libraryIds: [] };
+/** Used until the libraries load, and when they cannot be loaded. */
+export const FALLBACK_TARGETS: TabTargets = { movies: HOME_TARGET, shows: HOME_TARGET };
+
+const COLLECTION_TYPE: Record<LibraryKind, CollectionType> = {
+    movies: CollectionType.Movies,
+    shows: CollectionType.Tvshows
+};
+const LIBRARY_ROUTE: Record<LibraryKind, string> = { movies: 'movies', shows: 'tv' };
+/** Cross-library list (controllers/list.js with no parent): every item of this type on the server. */
+const COMBINED_ITEM_TYPE: Record<LibraryKind, string> = { movies: 'Movie', shows: 'Series' };
+/** Route params that scope list.js to one item; without them the list spans all libraries. */
+const LIST_SCOPE_PARAMS = [ 'genreId', 'musicGenreId', 'studioId', 'personId', 'parentId' ];
+const LIBRARY_ROUTE_KINDS: Record<string, LibraryKind> = { movies: 'movies', tv: 'shows' };
 
 export const BAR_CLASS = 'lg-tabbar';
 export const ROOT_CLASS = 'lg-has-tabbar';
 
+/** Raw value of one query parameter (ids and types are not percent-encoded), or null when absent. */
+function queryValue(query: string, key: string): string | null {
+    for (const pair of query.split('&')) {
+        const [ name, value = '' ] = pair.split('=');
+        if (name === key) return value;
+    }
+    return null;
+}
+
 /** Which tab a location hash belongs to, or null when none applies. */
-export function getActiveTab(hash: string): TabId | null {
+export function getActiveTab(hash: string, targets: TabTargets = FALLBACK_TARGETS): TabId | null {
     const match = /^#!?\/?([^?/]*)(?:\/[^?]*)?(?:\?(.*))?$/.exec(hash);
     if (!match) return null;
     const route = match[1].toLowerCase();
     const query = match[2] ?? '';
 
-    if (route === 'home') return /(^|&)tab=1(&|$)/.test(query) ? 'favorites' : 'home';
-    if (route === 'search') return 'search';
-    if (route.startsWith('mypreferences')) return 'profile';
-    if (LIBRARY_ROUTES.includes(route)) return 'libraries';
+    if (route === 'home') return queryValue(query, 'tab') === '1' ? 'favorites' : 'home';
+
+    const libraryKind = LIBRARY_ROUTE_KINDS[route];
+    if (libraryKind) {
+        const topParentId = queryValue(query, 'topParentId') ?? '';
+        return targets[libraryKind].libraryIds.includes(topParentId) ? libraryKind : null;
+    }
+
+    if (route === 'list' && !LIST_SCOPE_PARAMS.some(key => queryValue(query, key) !== null)) {
+        const type = queryValue(query, 'type');
+        if (type === COMBINED_ITEM_TYPE.movies) return 'movies';
+        if (type === COMBINED_ITEM_TYPE.shows) return 'shows';
+    }
     return null;
 }
 
+type ViewSummary = Pick<BaseItemDto, 'Id' | 'CollectionType'>;
+
+function targetFor(kind: LibraryKind, libraryIds: string[]): LibraryTarget {
+    if (libraryIds.length === 0) return HOME_TARGET;
+    if (libraryIds.length > 1) {
+        return { href: `#/list?type=${COMBINED_ITEM_TYPE[kind]}`, libraryIds };
+    }
+    const [ id ] = libraryIds;
+    const href = `#/${LIBRARY_ROUTE[kind]}?topParentId=${encodeURIComponent(id)}&collectionType=${COLLECTION_TYPE[kind]}`;
+    return { href, libraryIds };
+}
+
+/**
+ * Movies/Shows targets from the user's views. One library links to its page; several link to the
+ * cross-library list; none falls back to Home (the tab stays visible).
+ */
+export function buildTargets(views: readonly ViewSummary[]): TabTargets {
+    const idsOf = (kind: LibraryKind): string[] => views.flatMap(view => (
+        view.CollectionType === COLLECTION_TYPE[kind] && view.Id ? [ view.Id ] : []
+    ));
+    return {
+        movies: targetFor('movies', idsOf('movies')),
+        shows: targetFor('shows', idsOf('shows'))
+    };
+}
+
+function hrefOf(tab: TabDef, targets: TabTargets): string {
+    if (tab.library) return targets[tab.library].href;
+    return tab.href ?? HOME_TARGET.href;
+}
+
 /** Build the tab bar. Pure: no listeners, so it can be rendered in tests. */
-export function renderTabBar(active: TabId | null, translate: (key: string) => string): HTMLElement {
+export function renderTabBar(
+    active: TabId | null,
+    translate: (key: string) => string,
+    targets: TabTargets = FALLBACK_TARGETS
+): HTMLElement {
     const nav = document.createElement('nav');
     nav.className = BAR_CLASS;
     nav.setAttribute('aria-label', translate('Menu'));
 
     for (const tab of TABS) {
         const label = translate(tab.labelKey);
-        const item = document.createElement(tab.href ? 'a' : 'button');
+        const item = document.createElement('a');
         item.className = 'lg-tabbar-item';
         item.dataset.tab = tab.id;
         item.setAttribute('aria-label', label);
-        if (tab.href) {
-            item.setAttribute('href', tab.href);
-        } else {
-            item.setAttribute('type', 'button');
-            // Opens the nav drawer
-            item.setAttribute('aria-haspopup', 'true');
-        }
+        item.setAttribute('href', hrefOf(tab, targets));
         if (tab.id === active) item.setAttribute('aria-current', 'page');
 
         const icon = document.createElement('span');
@@ -88,8 +161,8 @@ export function shouldShowBar(doc: Document = document): boolean {
         && !doc.querySelector('.videoPlayerContainer');
 }
 
+/** Kept so the libraryMenu call site compiles. The bar no longer opens the library drawer. */
 export interface TabBarOptions {
-    /** Opens the main nav drawer (library list). Supplied by libraryMenu to avoid a circular import. */
     openLibraries: () => void
 }
 
@@ -97,7 +170,8 @@ let bar: HTMLElement | undefined;
 let observer: MutationObserver | undefined;
 let removeListeners: (() => void) | undefined;
 let observedHeader: Element | undefined;
-let currentOptions: TabBarOptions | undefined;
+let targets: TabTargets = FALLBACK_TARGETS;
+let cachedTargets: { key: string, promise: Promise<TabTargets> } | undefined;
 
 // React renders .skinHeader after this module loads, so it is observed lazily on first sight
 function observeHeader(): void {
@@ -114,10 +188,50 @@ function update(): void {
     bar.hidden = !visible;
     document.documentElement.classList.toggle(ROOT_CLASS, visible);
 
-    const active = getActiveTab(window.location.hash);
+    const active = getActiveTab(window.location.hash, targets);
     bar.querySelectorAll<HTMLElement>('.lg-tabbar-item').forEach(item => {
         if (active && item.dataset.tab === active) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
+    });
+}
+
+function applyTargets(nav: HTMLElement, resolved: TabTargets): void {
+    nav.querySelectorAll<HTMLAnchorElement>('.lg-tabbar-item').forEach(item => {
+        const tab = TABS.find(candidate => candidate.id === item.dataset.tab);
+        if (tab) item.setAttribute('href', hrefOf(tab, resolved));
+    });
+}
+
+type ApiClient = Awaited<ReturnType<typeof ServerConnections.getCurrentApiClientAsync>>;
+
+async function fetchTargets(apiClient: ApiClient): Promise<TabTargets> {
+    const result = await apiClient.getUserViews({}, apiClient.getCurrentUserId());
+    return buildTargets(result.Items ?? []);
+}
+
+/** Resolves the Movies/Shows targets once per server and user. A failed load is not cached. */
+async function loadTargets(): Promise<TabTargets> {
+    try {
+        const apiClient = await ServerConnections.getCurrentApiClientAsync();
+        const key = `${apiClient.serverId()}|${apiClient.getCurrentUserId()}`;
+        const entry = cachedTargets?.key === key ? cachedTargets : { key, promise: fetchTargets(apiClient) };
+        cachedTargets = entry;
+        return await entry.promise;
+    } catch (error) {
+        cachedTargets = undefined;
+        console.warn('[BottomTabBar] Could not load libraries; Movies and Shows link to Home.', error);
+        return FALLBACK_TARGETS;
+    }
+}
+
+function refreshTargets(): void {
+    const mounted = bar;
+    if (!mounted) return;
+    void loadTargets().then(resolved => {
+        if (bar !== mounted) return;
+        targets = resolved;
+        applyTargets(mounted, resolved);
+        update();
     });
 }
 
@@ -125,11 +239,7 @@ function onClick(e: Event): void {
     const item = (e.target as Element).closest<HTMLElement>('.lg-tabbar-item');
     if (!item) return;
 
-    if (item.dataset.tab === 'libraries') {
-        currentOptions?.openLibraries();
-        return;
-    }
-    if (item.dataset.tab === 'favorites' && getActiveTab(window.location.hash) === 'home') {
+    if (item.dataset.tab === 'favorites' && getActiveTab(window.location.hash, targets) === 'home') {
         // Already on home: the tab strip is live, so switch tabs rather than re-route to the same view
         const tabButton = document.querySelector<HTMLElement>('.headerTabs .emby-tab-button[data-index="1"]');
         if (tabButton) {
@@ -143,7 +253,7 @@ function onClick(e: Event): void {
 function mount(): void {
     if (bar) return;
 
-    bar = renderTabBar(getActiveTab(window.location.hash), key => globalize.translate(key));
+    bar = renderTabBar(getActiveTab(window.location.hash, targets), key => globalize.translate(key), targets);
     bar.addEventListener('click', onClick);
     document.body.append(bar);
 
@@ -159,6 +269,7 @@ function mount(): void {
     observer = new MutationObserver(update);
     observer.observe(document.body, { attributes: true, attributeFilter: [ 'class' ] });
     update();
+    refreshTargets();
 }
 
 function unmount(): void {
@@ -173,13 +284,14 @@ function unmount(): void {
 }
 
 function sync(): void {
-    if (isLiquidGlass() && layoutManager.mobile) mount();
+    if (isLiquidGlass() && !layoutManager.tv) mount();
     else unmount();
 }
 
-/** Show the mobile bottom tab bar while the Liquid Glass theme is active. Call once. */
-export function initBottomTabBar(options: TabBarOptions): void {
-    currentOptions = options;
+/** Show the bottom tab bar on phone and desktop while the Liquid Glass theme is active (not TV). Call once. */
+// libraryMenu passes openLibraries; the bar no longer uses it, so the parameter is kept only for that call site
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function initBottomTabBar(_options: TabBarOptions): void {
     Events.on(document, EventType.THEME_CHANGE, sync);
     // Layout can switch at runtime (e.g. rotating a tablet); sync is idempotent
     Events.on(layoutManager, 'modechange', sync);

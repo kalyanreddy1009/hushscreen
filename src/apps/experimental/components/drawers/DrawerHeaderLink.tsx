@@ -21,7 +21,7 @@ const DrawerHeaderLink = () => {
                 />
             </ListItemIcon>
             <ListItemText
-                primary={systemInfo?.ServerName || 'hushscreen'}
+                primary={systemInfo?.ServerName || 'HushScreen'}
                 secondary={systemInfo?.Version}
                 slotProps={{
                     primary: { variant: 'h6' }

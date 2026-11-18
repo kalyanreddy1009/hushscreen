@@ -35,6 +35,7 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
     }
 
     .headerTop {
+        position: relative; // anchors the absolutely centred wordmark
         padding: 0.54em var(--lg-space-3);
     }
 
@@ -49,6 +50,130 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
 
     .pageTitle {
         @include vibrant-text;
+    }
+
+    // Search field (desktop only, shown by the desktop block below). A tinted field, not a second glass
+    // layer: stacked glass blurs the hierarchy (liquid-glass.md › Restraint).
+    .lg-search-pill {
+        @include press;
+        @include focus-ring(var(--lg-radius-pill));
+        @include hit-target;
+
+        position: relative;
+        align-items: center;
+        gap: var(--lg-space-2);
+        width: 16rem;
+        max-width: 100%;
+        height: var(--lg-hit-min);
+        margin-left: var(--lg-space-2);
+        padding: 0 var(--lg-space-4);
+        border-radius: var(--lg-radius-pill);
+        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--lg-text-secondary);
+        font-size: 0.9375rem;
+        text-decoration: none;
+
+        @media (hover: hover) {
+            &:hover {
+                background-color: rgba(255, 255, 255, 0.12);
+            }
+        }
+
+        .material-icons {
+            font-size: 1.25rem;
+        }
+    }
+
+    .lg-search-pill__label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // Wordmark: centred in the capsule with auto margins (not translate), so the press scale on the link
+    // does not fight the centring transform. Hidden by the attribute unless the page has no title of its own.
+    .lg-wordmark {
+        @include press;
+        @include focus-ring(var(--lg-radius-pill));
+
+        display: none;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: max-content;
+        height: var(--lg-hit-min);
+        margin: auto;
+        align-items: center;
+        gap: var(--lg-space-2);
+        padding: 0 var(--lg-space-3);
+        border-radius: var(--lg-radius-pill);
+        color: var(--lg-text);
+        text-decoration: none;
+    }
+
+    // TV keeps its current header: the new wordmark never shows there
+    .layout-tv & .lg-wordmark {
+        display: none !important;
+    }
+
+    // Default title state (home, via LibraryMenu.setTitle(null)) carries pageTitleWithDefaultLogo:
+    // the centred wordmark replaces the stock banner title there. Phones keep the compact stock title:
+    // the header icons leave no free centre at that width.
+    @media (min-width: 50em) {
+        .layout-mobile &:has(.pageTitle.pageTitleWithDefaultLogo),
+        .layout-desktop &:has(.pageTitle.pageTitleWithDefaultLogo) {
+            .lg-wordmark {
+                display: flex;
+            }
+
+            .pageTitleWithDefaultLogo {
+                display: none;
+            }
+        }
+    }
+
+    // Phones: the mark alone sits beside the menu button (the banner title would be squeezed to a sliver)
+    @media (max-width: 49.99em) {
+        .layout-mobile &:has(.pageTitle.pageTitleWithDefaultLogo) {
+            .lg-wordmark {
+                display: flex;
+                right: auto;
+                left: calc(var(--lg-space-3) + var(--lg-hit-min));
+                margin: auto 0;
+                padding: 0 var(--lg-space-2);
+            }
+
+            .lg-wordmark__text {
+                display: none;
+            }
+
+            .pageTitleWithDefaultLogo {
+                display: none;
+            }
+        }
+    }
+
+    .lg-wordmark__mark {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+    }
+
+    .lg-wordmark__text {
+        font-size: 1.0625rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    // Bell slot: stays out of layout until another task removes the hidden attribute
+    .lg-header-bell:not([hidden]) {
+        @include hit-target;
+
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     // Condensed: tighter and a stronger fill so content scrolling beneath stays legible
@@ -117,6 +242,43 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         }
     }
 
+    // Desktop header: search field replaces the icon-only search button (the button stays in the DOM)
+    .layout-desktop .skinHeader .lg-search-pill {
+        display: inline-flex;
+    }
+
+    .layout-desktop .skinHeader .headerSearchButton {
+        display: none;
+    }
+
+    // Centred tabs take the centre: the wordmark hides and the field collapses to its icon, so nothing overlaps
+    .layout-desktop .skinHeader:has(.headerTabs:not(.hide)) .lg-search-pill {
+        width: var(--lg-hit-min);
+        padding: 0;
+        justify-content: center;
+    }
+
+    // Label stays in the accessibility tree, visually removed
+    .layout-desktop .skinHeader:has(.headerTabs:not(.hide)) .lg-search-pill__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    // Without the tab bar the section tabs stay in the header on home: the stock title returns
+    .layout-desktop:not(.lg-has-tabbar) .skinHeader:has(.headerTabs:not(.hide)) {
+        .lg-wordmark {
+            display: none;
+        }
+
+        .pageTitleWithDefaultLogo {
+            display: block;
+        }
+    }
+
     // One-row header: pages clear the capsule only (stock reserves a second row for the tabs)
     .layout-desktop .libraryPage:not(.noSecondaryNavPage) {
         padding-top: $lg-header-clearance !important;
@@ -127,17 +289,13 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
     }
 }
 
-// Phones with the tab bar: the tab bar owns the top-level destinations (tab-bars.md), so the header
-// drops its duplicates — Search and Profile buttons everywhere, and Home/Favorites tabs on the home page
-// (other pages keep their section tabs, e.g. a library's Movies/Genres). No :has() = both stay (harmless).
-.layout-mobile.lg-has-tabbar {
+// Phones and desktops with the tab bar: the tab bar owns the top-level destinations (tab-bars.md), so the header
+// drops its Home/Favorites tab duplicates on the home page (other pages keep their section tabs, e.g. a
+// library's Movies/Genres). Search and the avatar stay in the header: the tab bar no longer carries them.
+.layout-mobile.lg-has-tabbar,
+.layout-desktop.lg-has-tabbar {
     // Feeds _player.scss: .nowPlayingBar bottom = safe-area + this offset + 12px
     --lg-tabbar-offset: calc(#{$lg-tabbar-height} + var(--lg-space-3));
-
-    .skinHeader .headerSearchButton,
-    .skinHeader .headerUserButton {
-        display: none;
-    }
 
     &:has(#indexPage:not(.hide)) .skinHeader .headerTabs {
         display: none;

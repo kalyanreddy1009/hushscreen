@@ -1,2 +1,312 @@
 // tiles — Home row tiles (src/components/liquidglass/glassTile.ts).
 @use 'mixins' as *;
+
+// Content layer only: no glass, no backdrop-filter (performance on TV and weak GPUs).
+// Contrast over the tile fill (#2c2c2c, computed from rgba(255,255,255,0.06) on #1f1f1f):
+//   title (--lg-text, white 92%)           ≈ 12.0:1
+//   description (--lg-text-secondary, 64%) ≈  6.7:1
+//   chip text (#fff) on rgba(0,0,0,0.45) over typical artwork: ≥ 4.5:1 for artwork darker than ~#808080
+$tile-fill: rgba(255, 255, 255, 0.06);
+$tile-fill-reduced-transparency: #1c1c1e;
+$tile-border: rgba(255, 255, 255, 0.08);
+$tile-border-hover: rgba(255, 255, 255, 0.14);
+$tile-border-contrast: rgba(255, 255, 255, 0.4);
+// 0.55 keeps white chip text at ~4.7:1 even over pure-white artwork
+$tile-disc: rgba(0, 0, 0, 0.55);
+$tile-disc-size: 36px;
+$tile-width-landscape: 18rem;
+$tile-width-landscape-phone: 15rem;
+$tile-width-portrait: 11rem;
+$tile-width-portrait-phone: 9rem;
+$tile-phone-query: '(max-width: 40em)';
+
+.lg-tile {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--lg-space-2);
+    box-sizing: border-box;
+    width: $tile-width-landscape;
+    padding: var(--lg-space-2);
+    border: 1px solid $tile-border;
+    border-radius: var(--lg-radius-lg);
+    background-color: $tile-fill;
+    color: var(--lg-text);
+    transition:
+        transform var(--lg-dur-focus) var(--lg-ease-out),
+        border-color var(--lg-dur-focus) var(--lg-ease-out),
+        background-color var(--lg-dur-focus) var(--lg-ease-out);
+
+    @media #{$tile-phone-query} {
+        width: $tile-width-landscape-phone;
+    }
+
+    &--portrait {
+        width: $tile-width-portrait;
+
+        @media #{$tile-phone-query} {
+            width: $tile-width-portrait-phone;
+        }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            transform: translateY(-2px);
+            border-color: $tile-border-hover;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: border-color var(--lg-dur-focus) linear, background-color var(--lg-dur-focus) linear;
+
+        &:hover {
+            transform: none;
+        }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+        background-color: $tile-fill-reduced-transparency;
+    }
+
+    @media (prefers-contrast: more) {
+        border: 1px solid $tile-border-contrast;
+    }
+}
+
+.lg-tile__media {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--lg-radius-md);
+    background-color: var(--lg-surface-2);
+
+    .lg-tile--portrait & {
+        aspect-ratio: 2 / 3;
+    }
+}
+
+.lg-tile__image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.lg-tile__chip {
+    position: absolute;
+    top: var(--lg-space-2);
+    left: var(--lg-space-2);
+    max-width: 60%;
+    overflow: hidden;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--lg-radius-pill);
+    background-color: $tile-disc;
+    color: #fff;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lg-tile__icon {
+    line-height: 1;
+}
+
+// Hit area is at least 44px (--lg-hit-min); the visible disc is 36px and sits centred inside it.
+@mixin tile-disc-button {
+    @include hit-target;
+
+    position: relative;
+    z-index: 0;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--lg-radius-pill);
+    background: transparent;
+    cursor: pointer;
+
+    &::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: 0;
+        width: $tile-disc-size;
+        height: $tile-disc-size;
+        margin: auto;
+        border-radius: var(--lg-radius-pill);
+        transition: background-color var(--lg-dur-micro) var(--lg-ease-out);
+    }
+
+    &:disabled {
+        cursor: default;
+        opacity: 0.6;
+    }
+
+    @include press;
+    @include focus-ring(var(--lg-radius-pill));
+}
+
+.lg-tile__fav {
+    @include tile-disc-button;
+
+    position: absolute;
+    top: 0;
+    right: 0;
+    color: #fff;
+
+    &::before {
+        background-color: $tile-disc;
+    }
+
+    .lg-tile__icon {
+        font-size: 20px;
+    }
+}
+
+.lg-tile__body {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--lg-space-2);
+    padding: 0 var(--lg-space-1) var(--lg-space-1);
+}
+
+.lg-tile__text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.lg-tile__title {
+    overflow: hidden;
+    font-size: var(--lg-type-body);
+    font-weight: 600;
+    letter-spacing: var(--lg-track-body);
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lg-tile__desc {
+    overflow: hidden;
+    color: var(--lg-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lg-tile__play {
+    @include tile-disc-button;
+
+    color: var(--lg-on-accent);
+
+    &::before {
+        background-color: var(--lg-accent);
+    }
+
+    &:hover::before {
+        background-color: var(--lg-accent-hover);
+    }
+
+    .lg-tile__icon {
+        font-size: 22px;
+    }
+}
+
+// Row container for tiles (set by the home sections): one horizontal line of tiles inside the row scroller.
+.lg-tiles-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--lg-space-3);
+    white-space: normal;
+}
+
+// ---------------------------------------------------------------------------
+// TV (10-foot, D-pad): larger tiles, focus lift + ring, controls visible while the tile has focus.
+// The heart and play buttons are always rendered (nothing is hover-only), so a remote user reaches
+// them by moving right/down inside a focused tile; they stay at full opacity.
+// ---------------------------------------------------------------------------
+$tv-tile-focus-scale: 1.06;
+$tv-tile-width-landscape: 22rem;
+$tv-tile-width-portrait: 13.5rem;
+
+.layout-tv .lg-tile {
+    width: $tv-tile-width-landscape;
+    cursor: default;
+    transition:
+        transform var(--lg-dur-spring) var(--lg-ease-spring),
+        border-color var(--lg-dur-focus) var(--lg-ease-out),
+        background-color var(--lg-dur-focus) var(--lg-ease-out);
+
+    &.lg-tile--portrait {
+        width: $tv-tile-width-portrait;
+    }
+
+    &:focus {
+        outline: none;
+    }
+
+    &:focus,
+    &:focus-visible,
+    &:focus-within {
+        border-color: rgba(255, 255, 255, 0.92);
+        background-color: rgba(255, 255, 255, 0.14);
+    }
+
+    &:focus,
+    &:focus-visible {
+        z-index: 1;
+        transform: scale($tv-tile-focus-scale);
+        outline: 2px solid rgba(255, 255, 255, 0.92);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 6px var(--lg-accent-soft);
+    }
+
+    .lg-tile__title {
+        font-size: 1.125rem;
+    }
+
+    .lg-tile__desc {
+        font-size: 1rem;
+    }
+
+    .lg-tile__chip {
+        font-size: 0.875rem;
+    }
+
+    // Overview goes to primary text while the tile has focus (secondary at rest)
+    &:focus .lg-tile__desc,
+    &:focus-within .lg-tile__desc {
+        color: var(--lg-text);
+    }
+
+    .lg-tile__fav,
+    .lg-tile__play {
+        opacity: 1;
+    }
+}
+
+// Room for the lifted tile and its ring so the row scroller does not clip them
+.layout-tv .lg-tiles-row {
+    padding-block: var(--lg-space-3);
+    padding-inline: var(--lg-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .layout-tv .lg-tile {
+        transition: border-color var(--lg-dur-focus) linear, background-color var(--lg-dur-focus) linear;
+
+        &:focus,
+        &:focus-visible {
+            transform: none;
+        }
+    }
+}
