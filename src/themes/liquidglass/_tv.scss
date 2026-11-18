@@ -5,8 +5,12 @@
 
 $tv-focus-scale: 1.1; // tvOS lift for cards and details buttons
 $tv-hero-btn-scale: 1.08;
-$tv-hero-card-max: 1200px;
+$tv-hero-card-max: 1320px;
 $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+// Same ring as the TV tiles (_tiles.scss): white 92%, 3px, offset 4px
+$tv-focus-ring: 3px solid rgba(255, 255, 255, 0.92);
+$tv-focus-ring-offset: 4px;
+$tv-artwork-brightness: brightness(1.06);
 
 // ---------------------------------------------------------------------------
 // 1. Header: transparent top scrim instead of a solid bar; glass pill for tabs
@@ -21,9 +25,11 @@ $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
     backdrop-filter: none;
 }
 
+// 10-foot section tabs
 .layout-tv .skinHeader .emby-tab-button {
     border-radius: var(--lg-radius-pill);
     color: var(--lg-text-secondary);
+    font-size: 1.125rem;
 }
 
 // Selected tab: glass pill (clear), primary text and weight; the underline from _nav.scss is dropped
@@ -43,13 +49,30 @@ $tv-card-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
     color: var(--lg-text);
 }
 
+// Focused tab also gets the TV ring so the position is clear from a distance.
+// Inset: the tab strip is a scrollX container (overflow-y: hidden), which would clip an outer ring.
+.layout-tv .skinHeader .emby-tab-button:focus {
+    outline: $tv-focus-ring;
+    outline-offset: -3px;
+}
+
+// Header icons and clock sized for 10 feet (header buttons keep the focus ring from _nav.scss)
+.layout-tv .skinHeader .headerButton .material-icons {
+    font-size: 1.75rem;
+}
+
+.layout-tv .skinHeader .currentTimeText {
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
 // ---------------------------------------------------------------------------
 // 2. Hero carousel (home): wider centred card with the neighbours peeking, buttons lift on focus
 // ---------------------------------------------------------------------------
 // The header is a transparent scrim on TV; the carousel sits below it, so the stock page padding stays.
 // Card width for 10 feet. Beats the phone-width override in _hero.scss through the extra class.
 .layout-tv .lg-hero {
-    --lg-hero-card-w: min(64vw, #{$tv-hero-card-max});
+    --lg-hero-card-w: min(72vw, #{$tv-hero-card-max});
     --lg-hero-card-h: max(calc(var(--lg-hero-card-w) * 0.4375), 24rem);
 }
 
@@ -115,6 +138,14 @@ html.layout-tv .card .cardScalable {
     transition: transform var(--lg-dur-spring) var(--lg-ease-spring);
 }
 
+@media (prefers-reduced-motion: reduce) {
+    html.layout-tv .card .cardBox,
+    html.layout-tv .card .cardScalable,
+    html.layout-tv .card .cardFooter {
+        transition-duration: 1ms;
+    }
+}
+
 // :has() rules sit in their own lists: engines without :has() drop a whole selector list, which would
 // otherwise take the plain :focus rule with it (see _cards.scss:167).
 html.layout-tv .card:focus .cardBox {
@@ -125,18 +156,41 @@ html.layout-tv .card:has(:focus-visible) .cardBox {
     transform: scale($tv-focus-scale) translateZ(0);
 }
 
+// Non-visual cards: the ring and brightness sit on the artwork, the shadow too.
+// The ring is outline (not box-shadow) so it follows the artwork's radius without clipping.
 html.layout-tv .card:focus .cardBox:not(.visualCardBox) .cardScalable {
     transform: none;
     // Shadow sits on the artwork only (a card-wide layer also shadowed the title block and read as a
     // grey panel). It switches without a transition; the spring lift carries the change.
     box-shadow: $tv-card-shadow;
-    outline: none;
+    outline: $tv-focus-ring;
+    outline-offset: $tv-focus-ring-offset;
+    filter: $tv-artwork-brightness;
 }
 
 html.layout-tv .card:has(:focus-visible) .cardBox:not(.visualCardBox) .cardScalable {
     transform: none;
     box-shadow: $tv-card-shadow;
-    outline: none;
+    outline: $tv-focus-ring;
+    outline-offset: $tv-focus-ring-offset;
+    filter: $tv-artwork-brightness;
+}
+
+// Visual cards: the ring goes on the card box. Stock card.scss:96 sets `outline: none !important`
+// on .cardBox, so the ring needs !important to show.
+html.layout-tv .card:focus .cardBox.visualCardBox {
+    outline: $tv-focus-ring !important;
+    outline-offset: $tv-focus-ring-offset;
+}
+
+html.layout-tv .card:has(:focus-visible) .cardBox.visualCardBox {
+    outline: $tv-focus-ring !important;
+    outline-offset: $tv-focus-ring-offset;
+}
+
+html.layout-tv .card:focus .cardBox.visualCardBox .cardScalable,
+html.layout-tv .card:has(:focus-visible) .cardBox.visualCardBox .cardScalable {
+    filter: $tv-artwork-brightness;
 }
 
 // Text: secondary at rest, primary on focus; footer drops below the scaled artwork
@@ -171,6 +225,14 @@ html.layout-tv .card:focus .cardFooter {
 }
 
 // ---------------------------------------------------------------------------
+// 5. List rows (episodes, tracks): brighter fill and primary text on focus
+// ---------------------------------------------------------------------------
+.layout-tv .listItem:focus {
+    background: rgba(255, 255, 255, 0.22);
+    color: var(--lg-text);
+}
+
+// ---------------------------------------------------------------------------
 // 6. Details page buttons: tvOS focus (icon buttons invert to white, Play keeps its accent fill)
 // ---------------------------------------------------------------------------
 .layout-tv .itemDetailPage .mainDetailButtons .detailButton {
@@ -179,6 +241,8 @@ html.layout-tv .card:focus .cardFooter {
 
 .layout-tv .itemDetailPage .mainDetailButtons .detailButton:focus:not(:active) {
     transform: scale($tv-focus-scale);
+    outline: $tv-focus-ring;
+    outline-offset: $tv-focus-ring-offset;
 }
 
 // `background` shorthand also clears the base dim/sheen image stack
@@ -188,18 +252,18 @@ html.layout-tv .card:focus .cardFooter {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Reduced motion: keep the focus scale and state change, make them instant
+// 9. Reduced motion: keep the focus ring, brightness and state change; drop only the scale
 // ---------------------------------------------------------------------------
 @media (prefers-reduced-motion: reduce) {
     // Focus shows as the ring and glow only; no scale
-    .layout-tv .lg-hero__btn:focus:not(:active) {
+    .layout-tv .lg-hero__btn:focus:not(:active),
+    .layout-tv .itemDetailPage .mainDetailButtons .detailButton:focus:not(:active) {
         transform: none;
     }
 
-    html.layout-tv .card .cardBox,
-    html.layout-tv .card .cardScalable,
-    html.layout-tv .card .cardFooter {
-        transition-duration: 1ms;
+    html.layout-tv .card:focus .cardBox,
+    html.layout-tv .card:has(:focus-visible) .cardBox {
+        transform: none;
     }
 }
 
@@ -233,17 +297,22 @@ html.layout-tv .card:focus .cardFooter {
 // The stock card box sets outline: none with !important (card.scss), so the visual card ring needs !important too.
 @media (prefers-contrast: more) {
     html.layout-tv .card:focus .cardBox:not(.visualCardBox) .cardScalable {
-        outline: 3px solid var(--lg-text);
-        outline-offset: 4px;
+        outline: 4px solid var(--lg-text);
+        outline-offset: $tv-focus-ring-offset;
     }
 
     html.layout-tv .card:has(:focus-visible) .cardBox:not(.visualCardBox) .cardScalable {
-        outline: 3px solid var(--lg-text);
-        outline-offset: 4px;
+        outline: 4px solid var(--lg-text);
+        outline-offset: $tv-focus-ring-offset;
     }
 
     html.layout-tv .card:focus .cardBox.visualCardBox {
-        outline: 3px solid var(--lg-text) !important;
-        outline-offset: 4px;
+        outline: 4px solid var(--lg-text) !important;
+        outline-offset: $tv-focus-ring-offset;
+    }
+
+    html.layout-tv .card:has(:focus-visible) .cardBox.visualCardBox {
+        outline: 4px solid var(--lg-text) !important;
+        outline-offset: $tv-focus-ring-offset;
     }
 }

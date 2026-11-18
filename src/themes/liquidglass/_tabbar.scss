@@ -1,5 +1,6 @@
 // tabbar — Floating glass bottom tab bar (src/components/liquidglass/bottomTabBar.ts).
-// Phone: full-width pill inside the gutters. Desktop: compact pill centred at the bottom. Never on TV.
+// Phone: full-width pill inside the gutters. Desktop: compact pill centred at the bottom.
+// TV: pill centred at the top of the home screen only (lg-tabbar--top), sized for 10 feet.
 @use 'mixins' as *;
 
 // Desktop item width: wide enough for the 0.6875rem labels and a 44px+ hit target
@@ -95,4 +96,86 @@ $lg-tabbar-desktop-item-width: 4.5rem;
 .layout-desktop .lg-tabbar-item {
     flex: 0 0 auto;
     width: $lg-tabbar-desktop-item-width;
+}
+
+// ---------------------------------------------------------------------------
+// TV: top bar on the home screen (bottomTabBar.ts adds .lg-tabbar--top and html.lg-has-topbar)
+// ---------------------------------------------------------------------------
+// TV rem is large (about 20px at 720p): 2.75rem items keep the bar inside the 57px header button row
+$tv-tabbar-item-height: 2.75rem;
+// Centres the bar on the header buttons; left-aligned after the logo so it never meets the right-hand icons
+$tv-tabbar-top: 0.35rem;
+$tv-tabbar-left: 4.5rem;
+$tv-tabbar-away-shift: 1.5rem;
+
+// The bar replaces the header's Home/Favorites strip on the home page
+.layout-tv.lg-has-topbar:has(#indexPage:not(.hide)) .skinHeader .headerTabs,
+.layout-tv.lg-has-topbar .skinHeader .headerHomeButton {
+    display: none;
+}
+
+.layout-tv .lg-tabbar--top:not([hidden]) {
+    position: fixed;
+    z-index: 1000;
+    top: calc(#{$tv-tabbar-top} + env(safe-area-inset-top));
+    left: calc(#{$tv-tabbar-left} + env(safe-area-inset-left));
+    display: flex;
+    gap: var(--lg-space-1);
+    width: fit-content;
+    padding: var(--lg-space-1);
+    border-radius: var(--lg-radius-pill);
+    opacity: 1;
+    transition:
+        opacity 300ms ease-out,
+        transform 300ms ease-out;
+
+    // Scrolled down: slide up and fade; it returns at the top or when the remote moves focus into it
+    &.lg-tabbar--away:not(:focus-within) {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-#{$tv-tabbar-away-shift});
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: opacity 300ms ease-out;
+
+        &.lg-tabbar--away:not(:focus-within) {
+            transform: none;
+        }
+    }
+}
+
+.layout-tv .lg-tabbar--top .lg-tabbar-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lg-space-2);
+    min-height: $tv-tabbar-item-height;
+    padding: 0 var(--lg-space-3);
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text-secondary);
+    font-size: 1rem;
+    line-height: 1.1;
+    text-decoration: none;
+    white-space: nowrap;
+
+    // Current page: filled pill and heavier weight, never colour alone
+    &[aria-current='page'] {
+        background: var(--lg-accent-soft);
+        color: var(--lg-accent-text);
+        font-weight: 700;
+    }
+
+    // Remote focus: inset white ring (an outer one would spill past the bar's edge), plus a filled pill
+    &:focus {
+        background: rgba(255, 255, 255, 0.22);
+        color: var(--lg-text);
+        outline: 3px solid rgba(255, 255, 255, 0.92);
+        outline-offset: -3px;
+    }
+}
+
+.layout-tv .lg-tabbar--top .lg-tabbar-icon {
+    font-size: 1.5rem;
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Events from '../../utils/events';
 import { EventType } from '../../constants/eventType';
+import layoutManager from '../../components/layoutManager';
 import { buildTargets, FALLBACK_TARGETS, getActiveTab, initBottomTabBar, renderTabBar, shouldShowBar, TABS, type TabTargets } from './bottomTabBar';
 
 const apiMock = vi.hoisted(() => ({
@@ -204,10 +205,111 @@ describe('initBottomTabBar', () => {
         expect(document.querySelector('.lg-tabbar')).not.toBeNull();
     });
 
-    it('does not mount on TV layouts', () => {
-        apiMock.layout.tv = true;
-        initBottomTabBar(options);
-        expect(document.querySelector('.lg-tabbar')).toBeNull();
+    describe('TV layout', () => {
+        beforeEach(() => {
+            apiMock.layout.tv = true;
+            apiMock.layout.mobile = false;
+            window.location.hash = '#/home';
+        });
+
+        afterEach(() => {
+            window.location.hash = '';
+        });
+
+        it('mounts a top bar with the TV root class and not the tabbar root class', () => {
+            initBottomTabBar(options);
+            const root = document.documentElement.classList;
+
+            expect(document.querySelector('.lg-tabbar')?.classList.contains('lg-tabbar--top')).toBe(true);
+            expect(root.contains('lg-has-topbar')).toBe(true);
+            expect(root.contains('lg-has-tabbar')).toBe(false);
+        });
+
+        it('is shown on home and favorites and hidden elsewhere', () => {
+            initBottomTabBar(options);
+            const bar = document.querySelector<HTMLElement>('.lg-tabbar');
+            expect(bar?.hidden).toBe(false);
+
+            window.location.hash = '#/home?tab=1';
+            window.dispatchEvent(new Event('hashchange'));
+            expect(bar?.hidden).toBe(false);
+
+            window.location.hash = '#/details?id=1';
+            window.dispatchEvent(new Event('hashchange'));
+            expect(bar?.hidden).toBe(true);
+            expect(document.documentElement.classList.contains('lg-has-topbar')).toBe(false);
+        });
+
+        it('resolves Movies like on desktop', async () => {
+            apiMock.userId = 'user-tv';
+            apiMock.views = [ { Id: 'm1', CollectionType: 'movies' } ];
+            initBottomTabBar(options);
+            await flushPromises();
+
+            expect(document.querySelector('[data-tab="movies"]')?.getAttribute('href')).toBe('#/movies?topParentId=m1&collectionType=movies');
+        });
+
+        it('marks every tab item focusable for D-pad navigation', () => {
+            initBottomTabBar(options);
+            const items = document.querySelectorAll('.lg-tabbar-item');
+
+            expect(items).toHaveLength(4);
+            for (const item of items) expect(item.classList.contains('focusable')).toBe(true);
+        });
+
+        it('is hidden when the header has hiddenViewMenuBar', () => {
+            const header = document.createElement('div');
+            header.className = 'skinHeader hiddenViewMenuBar';
+            document.body.append(header);
+            initBottomTabBar(options);
+
+            expect(document.querySelector<HTMLElement>('.lg-tabbar')?.hidden).toBe(true);
+        });
+
+        it('stops listening for scroll after unmount', () => {
+            initBottomTabBar(options);
+            const bar = document.querySelector('.lg-tabbar');
+            document.documentElement.removeAttribute('data-jf-theme');
+            Events.trigger(document, EventType.THEME_CHANGE);
+
+            Object.defineProperty(window, 'scrollY', { value: 120, configurable: true });
+            expect(() => window.dispatchEvent(new Event('scroll'))).not.toThrow();
+            expect(bar?.classList.contains('lg-tabbar--away')).toBe(false);
+            Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+        });
+
+        it('refreshes the classes when the layout switches at runtime', () => {
+            apiMock.layout.tv = false;
+            initBottomTabBar(options);
+            const root = document.documentElement.classList;
+            const bar = document.querySelector('.lg-tabbar');
+            expect(root.contains('lg-has-tabbar')).toBe(true);
+
+            apiMock.layout.tv = true;
+            Events.trigger(layoutManager, 'modechange');
+            expect(bar?.classList.contains('lg-tabbar--top')).toBe(true);
+            expect(root.contains('lg-has-topbar')).toBe(true);
+            expect(root.contains('lg-has-tabbar')).toBe(false);
+
+            apiMock.layout.tv = false;
+            Events.trigger(layoutManager, 'modechange');
+            expect(bar?.classList.contains('lg-tabbar--top')).toBe(false);
+            expect(root.contains('lg-has-topbar')).toBe(false);
+            expect(root.contains('lg-has-tabbar')).toBe(true);
+        });
+
+        it('slides away once the page scrolls past 40px and returns at the top', () => {
+            initBottomTabBar(options);
+            const bar = document.querySelector('.lg-tabbar');
+
+            Object.defineProperty(window, 'scrollY', { value: 120, configurable: true });
+            window.dispatchEvent(new Event('scroll'));
+            expect(bar?.classList.contains('lg-tabbar--away')).toBe(true);
+
+            Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+            window.dispatchEvent(new Event('scroll'));
+            expect(bar?.classList.contains('lg-tabbar--away')).toBe(false);
+        });
     });
 
     it('does not mount outside the Liquid Glass theme', () => {

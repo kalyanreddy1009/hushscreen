@@ -55,6 +55,12 @@ const LIBRARY_ROUTE_KINDS: Record<string, LibraryKind> = { movies: 'movies', tv:
 
 export const BAR_CLASS = 'lg-tabbar';
 export const ROOT_CLASS = 'lg-has-tabbar';
+/** Root class on TV, where the bar sits at the top and only on the home page. */
+export const TV_ROOT_CLASS = 'lg-has-topbar';
+export const TOP_BAR_CLASS = 'lg-tabbar--top';
+export const AWAY_CLASS = 'lg-tabbar--away';
+/** TV: scrolling the page past this many pixels slides the bar out of the way. */
+const TV_SCROLL_AWAY_PX = 40;
 
 /** Raw value of one query parameter (ids and types are not percent-encoded), or null when absent. */
 function queryValue(query: string, key: string): string | null {
@@ -132,7 +138,7 @@ export function renderTabBar(
     for (const tab of TABS) {
         const label = translate(tab.labelKey);
         const item = document.createElement('a');
-        item.className = 'lg-tabbar-item';
+        item.className = 'lg-tabbar-item focusable';
         item.dataset.tab = tab.id;
         item.setAttribute('aria-label', label);
         item.setAttribute('href', hrefOf(tab, targets));
@@ -185,14 +191,29 @@ function observeHeader(): void {
     observer.observe(header, { attributes: true, attributeFilter: [ 'class' ] });
 }
 
+function updateScrollState(): void {
+    if (!bar) return;
+    if (!layoutManager.tv) {
+        // Phone and desktop never slide the bar away; clear a stale state after a layout switch
+        if (bar.classList.contains(AWAY_CLASS)) bar.classList.remove(AWAY_CLASS);
+        return;
+    }
+    bar.classList.toggle(AWAY_CLASS, window.scrollY > TV_SCROLL_AWAY_PX);
+}
+
 function update(): void {
     if (!bar) return;
     observeHeader();
-    const visible = shouldShowBar();
-    bar.hidden = !visible;
-    document.documentElement.classList.toggle(ROOT_CLASS, visible);
-
+    const tv = Boolean(layoutManager.tv);
     const active = getActiveTab(window.location.hash, targets);
+    // TV: top-level sections live in a top bar on the root (home) screen only; Back returns there
+    const visible = shouldShowBar() && (!tv || active === 'home' || active === 'favorites');
+    bar.hidden = !visible;
+    bar.classList.toggle(TOP_BAR_CLASS, tv);
+    document.documentElement.classList.toggle(ROOT_CLASS, visible && !tv);
+    document.documentElement.classList.toggle(TV_ROOT_CLASS, visible && tv);
+    updateScrollState();
+
     bar.querySelectorAll<HTMLElement>('.lg-tabbar-item').forEach(item => {
         if (active && item.dataset.tab === active) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
@@ -272,11 +293,17 @@ function onClick(e: Event): void {
     }
 }
 
+/** TV: the bar sits over the page top, so moving focus up into it returns the page to the top instead of covering the hero. */
+function onTopBarFocus(): void {
+    if (layoutManager.tv && window.scrollY > 0) window.scrollTo({ top: 0 });
+}
+
 function mount(): void {
     if (bar) return;
 
     bar = renderTabBar(getActiveTab(window.location.hash, targets), key => globalize.translate(key), targets);
     bar.addEventListener('click', onClick);
+    bar.addEventListener('focusin', onTopBarFocus);
     document.body.append(bar);
 
     // The user may sign in after mount, so each navigation re-checks the targets (cached once resolved)
@@ -286,9 +313,11 @@ function mount(): void {
     };
     window.addEventListener('hashchange', onNav);
     document.addEventListener('viewshow', onNav, true);
+    window.addEventListener('scroll', updateScrollState, { passive: true });
     removeListeners = () => {
         window.removeEventListener('hashchange', onNav);
         document.removeEventListener('viewshow', onNav, true);
+        window.removeEventListener('scroll', updateScrollState);
     };
 
     // libraryMenu and the video OSD toggle these classes; observing them avoids depending on event order
@@ -302,7 +331,7 @@ function unmount(): void {
     observer?.disconnect();
     removeListeners?.();
     bar?.remove();
-    document.documentElement.classList.remove(ROOT_CLASS);
+    document.documentElement.classList.remove(ROOT_CLASS, TV_ROOT_CLASS);
     bar = undefined;
     observer = undefined;
     observedHeader = undefined;
@@ -310,11 +339,16 @@ function unmount(): void {
 }
 
 function sync(): void {
-    if (isLiquidGlass() && !layoutManager.tv) mount();
-    else unmount();
+    if (isLiquidGlass()) {
+        mount();
+        // mount() is a no-op once mounted; re-run update so a layout switch refreshes the classes
+        update();
+    } else {
+        unmount();
+    }
 }
 
-/** Show the bottom tab bar on phone and desktop while the Liquid Glass theme is active (not TV). Call once. */
+/** Show the tab bar while the Liquid Glass theme is active: bottom on phone and desktop, top (home only) on TV. Call once. */
 // libraryMenu passes openLibraries; the bar no longer uses it, so the parameter is kept only for that call site
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function initBottomTabBar(_options: TabBarOptions): void {
