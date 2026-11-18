@@ -10,7 +10,7 @@ hushscreen is based on Jellyfin Web 10.11.11. It is not affiliated with or endor
 
 ## Features
 
-- **Glass theme.** A glass-material theme (theme id `liquidglass`) with a full-bleed home hero and a redesigned details page.
+- **Glass theme.** A glass-material theme, Hush Glass (theme id `liquidglass`), with a full-bleed home hero and a redesigned details page.
 - **Background trailers.** After you rest on a title for about 7 seconds, a muted trailer fades in place of the backdrop. This works on the details page, the home hero, and the focused card on TV layouts. Trailers stay off when reduced motion is on, when Save-Data is on, or when the browser tab is hidden.
 - **Personal home rows.** Rows such as Because You Watched, Because You Liked, Top Picks for You, Highly Rated, Not Yet Watched, and New in Your Genres. They are built from your play history and the server's similar-items data.
 - **Quality badges.** Badges for video and audio formats, using the official format logos. Supported formats include Dolby Vision, HDR, Dolby Atmos, Dolby TrueHD, Dolby Digital, Dolby Digital Plus, DTS, and DTS-HD Master Audio.
@@ -43,7 +43,7 @@ hushscreen is based on Jellyfin Web 10.11.11. It is not affiliated with or endor
    - Start the server with the `--webdir` option set to the path of the `dist/` folder. See the [Jellyfin documentation](https://jellyfin.org/docs/) for how to start the server with options.
    - Or replace the web folder bundled with the server with the contents of `dist/`.
 
-4. Open the server in a browser. Go to **Settings > Display** and choose the `liquidglass` theme.
+4. Open the server in a browser. Go to **Settings > Display** and choose the **Hush Glass** theme.
 
 ## Development
 
