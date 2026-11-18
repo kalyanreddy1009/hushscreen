@@ -12,11 +12,24 @@ const AMBIENT_CLASS = 'lg-ambient';
 const LAYER_CLASS = 'lg-ambient__layer';
 const VISIBLE_CLASS = 'is-visible';
 const COLOUR_PROPERTY = '--lg-ambient';
+const SCRIM_PROPERTY = '--lg-ambient-scrim';
 const DEBOUNCE_MS = 150;
 const SAMPLE_SIZE = 16;
 const RGBA_STRIDE = 4;
 /** Darkens the sampled artwork colour so glass and text stay readable over it. */
 const DARKEN_FACTOR = 0.6;
+/** Relative luminance the backdrop is brought down to: leaves room for a 0.08 white glass fill and keeps white text above 4.5:1. */
+const TARGET_LUMINANCE = 0.09;
+const SCRIM_MIN = 0.12;
+const SCRIM_MAX = 0.7;
+const SCRIM_SEARCH_ITERATIONS = 24;
+const SCRIM_DECIMALS = 1000;
+const LINEAR_THRESHOLD = 0.04045;
+const LINEAR_DIVISOR = 12.92;
+const GAMMA_OFFSET = 0.055;
+const GAMMA_SCALE = 1.055;
+const GAMMA_EXPONENT = 2.4;
+const MAX_CHANNEL = 255;
 
 let initialised = false;
 let root: HTMLElement | undefined;
@@ -50,6 +63,37 @@ export function averageRgb(data: Uint8ClampedArray): [number, number, number] {
     ];
 }
 
+function srgbToLinear(channel: number): number {
+    const value = channel / MAX_CHANNEL;
+    if (value <= LINEAR_THRESHOLD) return value / LINEAR_DIVISOR;
+    return ((value + GAMMA_OFFSET) / GAMMA_SCALE) ** GAMMA_EXPONENT;
+}
+
+function relativeLuminance(rgb: readonly [number, number, number], multiplier: number): number {
+    const [ red, green, blue ] = rgb.map(channel => srgbToLinear(channel * multiplier));
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+/** Scrim alpha that darkens the colour until white text on it keeps at least 4.5:1 contrast. */
+export function scrimAlphaFor(rgb: readonly [number, number, number]): number {
+    let multiplier = 1;
+    if (relativeLuminance(rgb, 1) > TARGET_LUMINANCE) {
+        let low = 0;
+        let high = 1;
+        for (let i = 0; i < SCRIM_SEARCH_ITERATIONS; i++) {
+            const middle = (low + high) / 2;
+            if (relativeLuminance(rgb, middle) <= TARGET_LUMINANCE) {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+        multiplier = low;
+    }
+    const alpha = Math.min(SCRIM_MAX, Math.max(SCRIM_MIN, 1 - multiplier));
+    return Math.round(alpha * SCRIM_DECIMALS) / SCRIM_DECIMALS;
+}
+
 function isHomeRoute(): boolean {
     const hash = window.location.hash;
     return hash === '' || hash.startsWith('#/home');
@@ -81,6 +125,7 @@ function ensureLayers(): [HTMLElement, HTMLElement] {
 
 function clearColour(): void {
     document.documentElement.style.removeProperty(COLOUR_PROPERTY);
+    document.documentElement.style.removeProperty(SCRIM_PROPERTY);
 }
 
 function cancelPending(): void {
@@ -123,6 +168,7 @@ function applyColour(image: HTMLImageElement): void {
     }
     const [ red, green, blue ] = average.map(channel => Math.round(channel * DARKEN_FACTOR));
     document.documentElement.style.setProperty(COLOUR_PROPERTY, `${red}, ${green}, ${blue}`);
+    document.documentElement.style.setProperty(SCRIM_PROPERTY, String(scrimAlphaFor(average)));
 }
 
 function escapeCssUrl(url: string): string {

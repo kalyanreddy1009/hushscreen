@@ -4,7 +4,7 @@ import { EventType } from '../../constants/eventType';
 import Events from '../../utils/events';
 import { LIQUID_GLASS_THEME_ID, THEME_ID_ATTRIBUTE } from '../../themes/liquidglass/isLiquidGlass';
 
-import { averageRgb, initAmbient } from './ambient';
+import { averageRgb, initAmbient, scrimAlphaFor } from './ambient';
 
 const HERO_EVENT = 'lg:herochange';
 const URL_A = 'https://server/Items/a/Images/Backdrop/0';
@@ -99,6 +99,7 @@ describe('ambient background', () => {
         expect(ambient.getAttribute('aria-hidden')).toBe('true');
         expect(visibleLayers()).toHaveLength(1);
         expect(layersOf()[1].classList.contains('is-visible')).toBe(true);
+        expect(Number(document.documentElement.style.getPropertyValue('--lg-ambient-scrim'))).toBeGreaterThanOrEqual(0.12);
     });
 
     it('ignores a repeat of the same url', () => {
@@ -144,6 +145,7 @@ describe('ambient background', () => {
 
         expect(visibleLayers()).toHaveLength(0);
         expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('');
+        expect(document.documentElement.style.getPropertyValue('--lg-ambient-scrim')).toBe('');
     });
 
     it('hides the layer instead of requesting "undefined" when the detail has no backdrop', () => {
@@ -207,6 +209,36 @@ describe('ambient background', () => {
         expect(console.debug).toHaveBeenCalledTimes(1);
         expect(document.documentElement.style.getPropertyValue('--lg-ambient')).toBe('');
         expect(visibleLayers()).toHaveLength(1);
+    });
+});
+
+describe('scrimAlphaFor', () => {
+    it('returns the minimum alpha for black', () => {
+        expect(scrimAlphaFor([ 0, 0, 0 ])).toBe(0.12);
+    });
+
+    // White needs alpha ~0.668 to reach luminance 0.09, which sits inside the 0.7 clamp
+    it('darkens white enough to meet the luminance target', () => {
+        expect(scrimAlphaFor([ 255, 255, 255 ])).toBe(0.668);
+    });
+
+    it('returns an alpha inside the clamp range for mid grey', () => {
+        const alpha = scrimAlphaFor([ 128, 128, 128 ]);
+
+        expect(alpha).toBeGreaterThan(0.12);
+        expect(alpha).toBeLessThan(0.7);
+        expect(alpha).toBeGreaterThanOrEqual(0.3);
+        expect(alpha).toBeLessThanOrEqual(0.5);
+    });
+
+    it('returns the smallest alpha that brings the sample brown to the target luminance', () => {
+        // Raw sample (113, 93, 73) has relative luminance 0.1182 at full brightness.
+        // Checked numerically: luminance is 0.08997 at alpha 0.123 and 0.09018 at 0.122, so 0.123 is the boundary.
+        expect(scrimAlphaFor([ 113, 93, 73 ])).toBe(0.123);
+    });
+
+    it('darkens brighter artwork more', () => {
+        expect(scrimAlphaFor([ 200, 200, 200 ])).toBeGreaterThanOrEqual(scrimAlphaFor([ 100, 100, 100 ]));
     });
 });
 

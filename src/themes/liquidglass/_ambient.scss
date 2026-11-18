@@ -9,12 +9,19 @@
     overflow: hidden;
     pointer-events: none;
 
-    // Darkening scrim over both layers; keeps body text at 4.5:1 or better
+    // Darkening scrim over both layers. The alpha comes from the artwork's measured luminance (ambient.ts)
+    // so white text on the pale glass stays above 4.5:1. Full strength from the top: the header sits there.
     &::after {
         content: '';
         position: absolute;
         inset: 0;
-        background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.75) 100%);
+        background:
+            linear-gradient(
+                180deg,
+                rgba(0, 0, 0, var(--lg-ambient-scrim, 0.38)) 0%,
+                rgba(0, 0, 0, var(--lg-ambient-scrim, 0.38)) 45%,
+                rgba(0, 0, 0, calc(var(--lg-ambient-scrim, 0.38) + 0.12)) 100%
+            );
     }
 }
 
@@ -25,7 +32,7 @@
     background-position: center;
     // Scale hides the blurred edges; filter is static and never animated
     transform: scale(1.2);
-    filter: blur(60px) saturate(1.2) brightness(0.45);
+    filter: blur(56px) saturate(1.2) brightness(1);
     opacity: 0;
     transition: opacity 1200ms var(--lg-ease-out);
 
@@ -64,4 +71,95 @@
 // The page background is opaque by default (_base.scss); while the ambient layer is showing, let it through.
 body:has(> .lg-ambient:not([hidden])) .backgroundContainer {
     background: transparent;
+}
+
+// Frosted glass on the home backdrop. Applies only while the backdrop shows, never on TV (old TV browsers,
+// and TV has its own focus styling). Where :has() is unsupported the dark look simply stays.
+// On by default, then undone below for reduced transparency and increased contrast: a `no-preference`
+// query would be false in browsers that do not know the feature, and they would never get the look.
+// The pale tokens are scoped to the header and tab bar, so dialogs, menus and the drawer keep their dark glass.
+$frosted: 'html:not(.layout-tv):has(> body > .lg-ambient:not([hidden]) > .lg-ambient__layer.is-visible)';
+
+// Header and tab bar: pale frosted fills over the artwork. 0.08 keeps white icons and text above 4.5:1
+// over the scrimmed backdrop (TARGET_LUMINANCE in ambient.ts assumes this fill).
+#{$frosted} .skinHeader,
+#{$frosted} .lg-tabbar {
+    --lg-glass-regular-fill: rgba(255, 255, 255, 0.08);
+    --lg-glass-frosted-fill: rgba(255, 255, 255, 0.1);
+    --lg-glass-edge: rgba(255, 255, 255, 0.24);
+    --lg-glass-specular: rgba(255, 255, 255, 0.3);
+    --lg-shadow-glass: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+// Header: the dark upward shadow is dropped, so the bar is not darkened by the page below it
+#{$frosted} .skinHeader {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+// Home cards: glass frames around each card, on phone and desktop whether or not the backdrop has loaded,
+// so card geometry never shifts when it arrives. No per-card blur: the backdrop behind is already blurred.
+// !important beats the stock `.cardBox { padding: 0 !important }` in src/components/cardbuilder/card.scss.
+html:not(.layout-tv) .homeSectionsContainer .card .cardBox {
+    padding: 8px 8px 4px !important;
+    border-radius: var(--lg-radius-lg);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+
+html:not(.layout-tv) .homeSectionsContainer .card .cardScalable {
+    border-radius: var(--lg-radius-md);
+    overflow: hidden;
+}
+
+// Glass tile rows on home
+#{$frosted} .lg-tile {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+
+// Card text sits on the frames, so it gets a faint shadow to hold over bright artwork
+#{$frosted} .homeSectionsContainer .cardText {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+// Reduced transparency and increased contrast: back to the solid glass and the header's own shadow
+// (_nav.scss), matching the :root overrides in _tokens.scss
+@media (prefers-reduced-transparency: reduce) {
+    #{$frosted} .skinHeader,
+    #{$frosted} .lg-tabbar {
+        --lg-glass-regular-fill: var(--lg-glass-solid);
+        --lg-glass-frosted-fill: var(--lg-glass-solid);
+    }
+
+    html:not(.layout-tv) .homeSectionsContainer .card .cardBox,
+    #{$frosted} .lg-tile {
+        background-color: var(--lg-glass-solid);
+    }
+}
+
+@media (prefers-contrast: more) {
+    #{$frosted} .skinHeader,
+    #{$frosted} .lg-tabbar {
+        --lg-glass-regular-fill: #141414;
+        --lg-glass-frosted-fill: #141414;
+        --lg-glass-edge: rgba(255, 255, 255, 0.6);
+    }
+
+    html:not(.layout-tv) .homeSectionsContainer .card .cardBox,
+    #{$frosted} .lg-tile {
+        background-color: #141414;
+        border-color: rgba(255, 255, 255, 0.6);
+        box-shadow: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    #{$frosted} .skinHeader {
+        box-shadow:
+            inset 0 1px 0 var(--lg-glass-specular),
+            var(--lg-shadow-glass),
+            0 -28px 22px -6px rgba(var(--lg-bg-rgb), 0.92);
+    }
 }

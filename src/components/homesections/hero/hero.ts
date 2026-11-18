@@ -625,9 +625,17 @@ class Hero implements HeroController {
         const target = e.target as HTMLElement;
         const button = target.closest<HTMLElement>('[data-action]');
         if (!button) {
-            // A peeking neighbour comes to the centre when tapped.
             const slide = target.closest<HTMLElement>('.lg-hero__slide');
-            if (slide && !slide.classList.contains('is-active')) this.goToIndex(Number(slide.dataset.index));
+            if (!slide) return;
+            // A peeking neighbour comes to the centre when tapped.
+            if (!slide.classList.contains('is-active')) {
+                this.goToIndex(Number(slide.dataset.index));
+                return;
+            }
+            // The centre card opens its title, like any other card; links inside it (rating badges) keep their own target.
+            if (target.closest('a')) return;
+            this.cancelTrailer();
+            appRouter.showItem(this.items[this.current]);
             return;
         }
         const item = this.items[this.current];

@@ -494,6 +494,30 @@ describe('hero trailer and TV focus', () => {
         expect(cancelOrder).toBeLessThan(showItem.mock.invocationCallOrder[0]);
     });
 
+    it('opens the title when the centre card itself is clicked', async () => {
+        showItem.mockClear();
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        container.querySelector<HTMLElement>('.lg-hero__slide.is-active .lg-hero__title, .lg-hero__slide.is-active')?.click();
+
+        expect(showItem).toHaveBeenCalledTimes(1);
+        expect(showItem.mock.calls[0][0]).toMatchObject({ Id: 'a' });
+        const cancelOrder = trailerAt().cancel.mock.invocationCallOrder.at(-1) ?? 0;
+        expect(cancelOrder).toBeLessThan(showItem.mock.invocationCallOrder[0]);
+    });
+
+    it('does not open the title when a link inside the card is clicked', async () => {
+        showItem.mockClear();
+        await mountHero(container, makeClient([trailerItem('a')]));
+        await flush();
+        const link = document.createElement('a');
+        link.href = '#external';
+        container.querySelector('.lg-hero__slide.is-active')?.append(link);
+        link.click();
+
+        expect(showItem).not.toHaveBeenCalled();
+    });
+
     it('cancels the trailer when playback starts', async () => {
         await mountHero(container, makeClient([trailerItem('a')]));
         await flush();

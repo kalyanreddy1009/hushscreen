@@ -51,7 +51,7 @@ let headroomInitialised = false;
 function renderHeader() {
     let html = '';
     html += '<div class="flex align-items-center flex-grow headerTop">';
-    // Glass theme only: shown by _nav.scss when the page has no title of its own (see setDefaultTitle)
+    // Glass theme only: the logo mark, first in the header on every non-TV page, links home (_nav.scss)
     html += '<a href="#/home" class="lg-wordmark" aria-label="' + escapeHtml(globalize.translate('LiquidGlassBrandHome')) + '"><span class="lg-wordmark__mark" aria-hidden="true">' + renderBrandMark({ size: 32, idPrefix: 'hs-hdr' }) + '</span><span class="lg-wordmark__text">HushScreen</span></a>';
     html += '<div class="headerLeft">';
     html += '<button type="button" is="paper-icon-button-light" class="headerButton headerButtonLeft headerBackButton hide"><span class="material-icons ' + (browser.safari ? 'chevron_left' : 'arrow_back') + '" aria-hidden="true"></span></button>';

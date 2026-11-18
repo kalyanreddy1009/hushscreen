@@ -35,7 +35,7 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
     }
 
     .headerTop {
-        position: relative; // anchors the absolutely centred wordmark
+        position: relative;
         padding: 0.54em var(--lg-space-3);
     }
 
@@ -90,68 +90,32 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         white-space: nowrap;
     }
 
-    // Wordmark: centred in the capsule with auto margins (not translate), so the press scale on the link
-    // does not fight the centring transform. Hidden by the attribute unless the page has no title of its own.
+    // Logo: the mark alone, first in the bar on every page, and the way home (the link's aria-label names it).
+    // A flex item rather than centred: a centred name competed with the page and the search field.
     .lg-wordmark {
         @include press;
         @include focus-ring(var(--lg-radius-pill));
+        @include hit-target;
 
-        display: none;
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: max-content;
-        height: var(--lg-hit-min);
-        margin: auto;
+        display: inline-flex;
+        flex: none;
         align-items: center;
-        gap: var(--lg-space-2);
-        padding: 0 var(--lg-space-3);
+        justify-content: center;
         border-radius: var(--lg-radius-pill);
         color: var(--lg-text);
         text-decoration: none;
     }
 
-    // TV keeps its current header: the new wordmark never shows there
+    // TV keeps its current header: the logo never shows there
     .layout-tv & .lg-wordmark {
         display: none !important;
     }
 
-    // Default title state (home, via LibraryMenu.setTitle(null)) carries pageTitleWithDefaultLogo:
-    // the centred wordmark replaces the stock banner title there. Phones keep the compact stock title:
-    // the header icons leave no free centre at that width.
-    @media (min-width: 50em) {
-        .layout-mobile &:has(.pageTitle.pageTitleWithDefaultLogo),
-        .layout-desktop &:has(.pageTitle.pageTitleWithDefaultLogo) {
-            .lg-wordmark {
-                display: flex;
-            }
-
-            .pageTitleWithDefaultLogo {
-                display: none;
-            }
-        }
-    }
-
-    // Phones: the mark alone sits beside the menu button (the banner title would be squeezed to a sliver)
-    @media (max-width: 49.99em) {
-        .layout-mobile &:has(.pageTitle.pageTitleWithDefaultLogo) {
-            .lg-wordmark {
-                display: flex;
-                right: auto;
-                left: calc(var(--lg-space-3) + var(--lg-hit-min));
-                margin: auto 0;
-                padding: 0 var(--lg-space-2);
-            }
-
-            .lg-wordmark__text {
-                display: none;
-            }
-
-            .pageTitleWithDefaultLogo {
-                display: none;
-            }
+    // Home's stock banner title is replaced by the logo, so the centre of the bar stays clear
+    .layout-mobile &,
+    .layout-desktop & {
+        .pageTitleWithDefaultLogo {
+            display: none;
         }
     }
 
@@ -161,10 +125,14 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         display: inline-flex;
     }
 
+    // Name kept for assistive tech only; the link's aria-label already reads it
     .lg-wordmark__text {
-        font-size: 1.0625rem;
-        font-weight: 600;
-        letter-spacing: -0.01em;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 
     // Bell slot: stays out of layout until another task removes the hidden attribute
@@ -251,7 +219,7 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         display: none;
     }
 
-    // Centred tabs take the centre: the wordmark hides and the field collapses to its icon, so nothing overlaps
+    // Centred tabs take the centre: the field collapses to its icon, so nothing overlaps
     .layout-desktop .skinHeader:has(.headerTabs:not(.hide)) .lg-search-pill {
         width: var(--lg-hit-min);
         padding: 0;
@@ -266,17 +234,6 @@ $lg-header-clearance: calc(#{$lg-header-inset} + 5rem + var(--lg-space-3) + env(
         overflow: hidden;
         clip-path: inset(50%);
         white-space: nowrap;
-    }
-
-    // Without the tab bar the section tabs stay in the header on home: the stock title returns
-    .layout-desktop:not(.lg-has-tabbar) .skinHeader:has(.headerTabs:not(.hide)) {
-        .lg-wordmark {
-            display: none;
-        }
-
-        .pageTitleWithDefaultLogo {
-            display: block;
-        }
     }
 
     // One-row header: pages clear the capsule only (stock reserves a second row for the tabs)

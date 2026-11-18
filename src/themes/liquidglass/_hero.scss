@@ -65,8 +65,9 @@
     transform: translate3d(-50%, 0, 0);
     will-change: transform, opacity;
 
+    // The centre card is clickable (opens the title)
     &.is-active {
-        cursor: grab;
+        cursor: pointer;
     }
 
     // Readability scrim: dark at the bottom where the copy sits, easing out toward the artwork
