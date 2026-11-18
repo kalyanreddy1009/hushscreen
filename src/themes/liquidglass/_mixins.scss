@@ -110,3 +110,6 @@
     min-width: $min;
     min-height: $min;
 }
+
+// Height of the floating bottom tab bar; shared by _tabbar.scss and the header offset in _nav.scss.
+$lg-tabbar-height: 4rem;

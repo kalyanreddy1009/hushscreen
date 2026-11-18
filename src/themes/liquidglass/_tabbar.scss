@@ -1,0 +1,72 @@
+// tabbar — Floating glass bottom tab bar (src/components/liquidglass/bottomTabBar.ts).
+@use 'mixins' as *;
+
+// Bottom tab bar
+.lg-tabbar {
+    @include glass(regular);
+
+    display: none;
+}
+
+.layout-mobile {
+    // Page content must clear the floating bar
+    &.lg-has-tabbar body {
+        padding-bottom: calc(#{$lg-tabbar-height} + var(--lg-space-4) + env(safe-area-inset-bottom));
+    }
+
+    .lg-tabbar:not([hidden]) {
+        position: fixed;
+        z-index: 1000;
+        right: var(--lg-gutter);
+        bottom: calc(var(--lg-space-3) + env(safe-area-inset-bottom));
+        left: var(--lg-gutter);
+        display: flex;
+        justify-content: space-around;
+        gap: var(--lg-space-1);
+        height: $lg-tabbar-height;
+        padding: var(--lg-space-1);
+        border-radius: var(--lg-radius-pill);
+    }
+
+    .lg-tabbar-item {
+        @include hit-target;
+        @include press;
+        @include focus-ring(var(--lg-radius-pill), -2px);
+
+        display: flex;
+        flex: 1 1 0;
+        min-width: 44px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 0 var(--lg-space-1);
+        border: 0;
+        border-radius: var(--lg-radius-pill);
+        background: transparent;
+        color: var(--lg-text-secondary);
+        font: inherit;
+        font-size: 0.6875rem;
+        line-height: 1.1;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+
+        &[aria-current='page'] {
+            background: var(--lg-accent-soft);
+            color: var(--lg-accent-text);
+            font-weight: 600;
+        }
+    }
+
+    .lg-tabbar-icon {
+        font-size: 1.5rem;
+    }
+
+    .lg-tabbar-label {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}

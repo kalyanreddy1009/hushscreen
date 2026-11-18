@@ -33,6 +33,7 @@ import { initBottomTabBar } from '../components/liquidglass/bottomTabBar';
 import { initHeaderScroll } from '../components/liquidglass/headerScroll';
 import { initCardTilt } from '../components/liquidglass/cardTilt';
 import { initTvCardTrailer } from '../components/liquidglass/tvCardTrailer';
+import { initAmbient } from '../components/liquidglass/ambient';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -863,6 +864,7 @@ initHeaderScroll();
 initBottomTabBar({ openLibraries: openMainDrawer });
 initCardTilt();
 initTvCardTrailer();
+initAmbient();
 
 const LibraryMenu = {
     getTopParentId,
