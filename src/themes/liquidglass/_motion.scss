@@ -91,6 +91,21 @@ $stagger-count: 12;
 }
 
 @media (prefers-reduced-motion: no-preference) {
+    // Pages also rise a few pixels as they fade in; TV keeps its own page animation (_tv.scss)
+    @keyframes lg-page-rise {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 10px, 0);
+        }
+    }
+
+    // Not on pages with a fixed alphabet picker: the transform would make it jump while the page rises
+    html:not(.layout-tv) .mainAnimatedPage:not(.hide):not(:has(.alphaPicker-fixed)) {
+        animation: lg-page-rise var(--lg-dur-page) var(--lg-ease-out) backwards;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
     // -----------------------------------------------------------------------
     // 2. Rails and lists: items cascade in, left to right, as their row loads
     // -----------------------------------------------------------------------
@@ -299,5 +314,41 @@ $stagger-count: 12;
 @media (prefers-reduced-motion: reduce) {
     .lg-hero__dot > span {
         transition: background-color var(--lg-dur-glass) linear;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11. Loading placeholders: empty home rows show card outlines until their items arrive
+// ---------------------------------------------------------------------------
+// Rows with no results are hidden (.hide), so only rows still loading show outlines. Pulse is motion-gated;
+// under reduced motion the outlines stay static.
+.homeSectionsContainer > .verticalSection:not(.hide) .itemsContainer.scrollSlider:empty {
+    --lg-row-placeholder-h: clamp(7rem, 13vw, 11rem);
+    min-height: var(--lg-row-placeholder-h);
+
+    // One rounded 16:9 card followed by a gap, tiled horizontally in a translucent glass fill
+    &::before {
+        content: '';
+        display: block;
+        height: var(--lg-row-placeholder-h);
+        background-color: var(--lg-glass-clear-fill);
+        mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%2099'%3E%3Crect%20width='176'%20height='99'%20rx='10'%20fill='black'/%3E%3C/svg%3E");
+        mask-repeat: repeat-x;
+        mask-size: auto 100%;
+        mask-position: left top;
+        pointer-events: none;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    @keyframes lg-placeholder-pulse {
+        from { opacity: 0.55; }
+        to { opacity: 1; }
+    }
+
+    // Slow breathing pulse so the outlines read as loading, not as content. Capped (about 10s) so a row
+    // whose load failed settles to a still outline instead of pulsing forever.
+    .homeSectionsContainer > .verticalSection:not(.hide) .itemsContainer.scrollSlider:empty::before {
+        animation: lg-placeholder-pulse 1.2s ease-in-out 8 alternate;
     }
 }

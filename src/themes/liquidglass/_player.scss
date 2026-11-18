@@ -169,7 +169,7 @@ $lg-btn-tv: 56px;
     @include focus-ring(var(--lg-radius-pill));
 
     border-radius: var(--lg-radius-pill);
-    color: #fff;
+    color: var(--lg-text);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -214,6 +214,7 @@ $lg-btn-tv: 56px;
 // primary scrubbing affordance. Accent stays reserved for the now-playing progress line.
 // Track grows via scaleY (not height); thumb appears via scale (not width/height).
 // ---------------------------------------------------------------------------
+// 28px scrub row (the desktop control default); a taller row would overlap the time and button rows
 .videoOsdBottom .mdl-slider-container {
     height: 28px;
 }
@@ -281,6 +282,16 @@ $lg-btn-tv: 56px;
     .videoOsdBottom .osdPositionSlider:focus-visible::-moz-range-thumb,
     .videoOsdBottom .osdPositionSlider:active::-moz-range-thumb {
         transform: scale(1);
+    }
+}
+
+// Reduced motion: slider scale and thumb transitions are removed; positions still update instantly.
+@media (prefers-reduced-motion: reduce) {
+    .videoOsdBottom .mdl-slider-background-flex,
+    .videoOsdBottom .mdl-slider::-webkit-slider-thumb,
+    .videoOsdBottom .mdl-slider::-moz-range-thumb,
+    .sliderBubble {
+        transition: none;
     }
 }
 

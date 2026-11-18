@@ -63,6 +63,11 @@ $details-wide-query: '(min-width: 75em)';
     --lg-details-hero-h: min(56.25vw, calc(100vh - 7rem));
 }
 
+// Desktop with the floating tab bar: the hero ends above the bar, so the title block and Play button never sit under it
+.layout-desktop.lg-has-tabbar .itemDetailPage {
+    --lg-details-hero-h: min(56.25vw, calc(100vh - 3rem - #{$lg-tabbar-height} - var(--lg-space-4)));
+}
+
 // Seam: the banner and its trailer child dissolve to transparent at the bottom, so the warm page shows through
 // instead of a flat grey band. The mask replaces the old bottom gradient into --lg-bg, which painted neutral grey.
 $details-backdrop-seam: linear-gradient(to bottom, #000 0%, #000 55%, rgba(0, 0, 0, 0.6) 75%, transparent 100%);

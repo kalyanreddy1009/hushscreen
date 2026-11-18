@@ -84,9 +84,11 @@ html,
     color: var(--lg-text);
 }
 
+// No surface token is lighter than --lg-surface-3 (the rest state), so focus adds a ring instead of a fill
 .raised:focus,
 .fab:focus {
-    background: #2c2c37;
+    background: var(--lg-surface-3);
+    box-shadow: 0 0 0 2px var(--lg-text);
 }
 
 .emby-button {
@@ -191,7 +193,18 @@ html,
     border: 1px solid var(--lg-separator);
     border-radius: var(--lg-radius-sm);
     color: var(--lg-text);
+    min-height: var(--lg-hit-min);
     transition: border-color var(--lg-dur-micro) var(--lg-ease-out), box-shadow var(--lg-dur-micro) var(--lg-ease-out);
+}
+
+// Stock select is not covered by the rule above; same 44px floor as text inputs
+.emby-select {
+    min-height: var(--lg-hit-min);
+}
+
+// Inline selects (sort and filter bars, compact toolbars) keep their stock height
+.selectContainer-inline > .emby-select {
+    min-height: 0;
 }
 
 .emby-input:focus,
@@ -208,6 +221,11 @@ html,
 .emby-checkbox:checked + span + .checkboxOutline {
     border-color: var(--lg-accent);
     background-color: var(--lg-accent);
+}
+
+// Keyboard focus ring also on checked boxes, where the accent fill hides a border change
+.emby-checkbox:focus-visible + span + .checkboxOutline {
+    box-shadow: 0 0 0 2px var(--lg-bg), 0 0 0 4px var(--lg-text);
 }
 
 .emby-checkbox:focus:not(:checked) + span + .checkboxOutline {
@@ -272,6 +290,12 @@ html,
 
 .listItem:focus {
     background: rgba(255, 255, 255, 0.09);
+}
+
+// !important is needed to beat stock listview.scss `outline: none !important` on .listItem
+.listItem:focus-visible {
+    outline: 2px solid var(--lg-text) !important;
+    outline-offset: -2px;
 }
 
 .mediaInfoText {

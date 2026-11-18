@@ -1,6 +1,6 @@
 // tabbar — Floating glass bottom tab bar (src/components/liquidglass/bottomTabBar.ts).
 // Phone: full-width pill inside the gutters. Desktop: compact pill centred at the bottom.
-// TV: pill centred at the top of the home screen only (lg-tabbar--top), sized for 10 feet.
+// TV: pill at the top-left of the four top-level screens (lg-tabbar--top), sized for 10 feet.
 @use 'mixins' as *;
 
 // Desktop item width: wide enough for the 0.6875rem labels and a 44px+ hit target
@@ -112,6 +112,17 @@ $tv-tabbar-away-shift: 1.5rem;
 .layout-tv.lg-has-topbar:has(#indexPage:not(.hide)) .skinHeader .headerTabs,
 .layout-tv.lg-has-topbar .skinHeader .headerHomeButton {
     display: none;
+}
+
+// Library screens: the bar's current pill names the page, so the plain text title (which would sit under the bar) is hidden
+// Clipped rather than visibility: hidden, so screen readers still read the page name
+.layout-tv.lg-has-topbar .skinHeader .pageTitle:not(.pageTitleWithLogo) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .layout-tv .lg-tabbar--top:not([hidden]) {

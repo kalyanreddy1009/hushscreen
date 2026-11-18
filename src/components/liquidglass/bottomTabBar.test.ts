@@ -225,14 +225,22 @@ describe('initBottomTabBar', () => {
             expect(root.contains('lg-has-tabbar')).toBe(false);
         });
 
-        it('is shown on home and favorites and hidden elsewhere', () => {
+        it('is shown on the four top-level screens and hidden on detail pages', async () => {
+            apiMock.userId = 'user-tv-top';
+            apiMock.views = [ { Id: 'm1', CollectionType: 'movies' } ];
             initBottomTabBar(options);
+            await flushPromises();
             const bar = document.querySelector<HTMLElement>('.lg-tabbar');
             expect(bar?.hidden).toBe(false);
 
             window.location.hash = '#/home?tab=1';
             window.dispatchEvent(new Event('hashchange'));
             expect(bar?.hidden).toBe(false);
+
+            window.location.hash = '#/movies?topParentId=m1&collectionType=movies';
+            window.dispatchEvent(new Event('hashchange'));
+            expect(bar?.hidden).toBe(false);
+            expect(document.querySelector('[data-tab="movies"]')?.getAttribute('aria-current')).toBe('page');
 
             window.location.hash = '#/details?id=1';
             window.dispatchEvent(new Event('hashchange'));

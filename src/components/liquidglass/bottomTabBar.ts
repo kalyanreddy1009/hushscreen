@@ -206,8 +206,8 @@ function update(): void {
     observeHeader();
     const tv = Boolean(layoutManager.tv);
     const active = getActiveTab(window.location.hash, targets);
-    // TV: top-level sections live in a top bar on the root (home) screen only; Back returns there
-    const visible = shouldShowBar() && (!tv || active === 'home' || active === 'favorites');
+    // TV: the top bar shows on the four top-level screens only; detail pages rely on Back
+    const visible = shouldShowBar() && (!tv || active !== null);
     bar.hidden = !visible;
     bar.classList.toggle(TOP_BAR_CLASS, tv);
     document.documentElement.classList.toggle(ROOT_CLASS, visible && !tv);
